@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="CyberForensics: Digital Detective – A serious game for Computer Forensics and Cyber Crime Analysis. Investigate 6 realistic forensics scenarios covering evidence acquisition, data carving, file system analysis, memory forensics, network forensics, and mobile forensics." />
+  <title>CyberForensics: Digital Detective</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════
+     SCREEN 1 – TITLE / SPLASH
+════════════════════════════════════════════════════════════ -->
+<div id="screen-title" class="screen">
+  <div class="title-logo">🕵️</div>
+  <h1 class="title-main">CyberForensics<br>Digital Detective</h1>
+  <p class="title-sub">Computer Forensics &amp; Cyber Crime Analysis — Serious Game</p>
+
+  <div class="title-description">
+    <p>
+      You are a <strong>digital forensics investigator</strong>. Six cases await, each testing
+      your expertise in a different forensics domain. Analyse evidence, apply forensic
+      principles, and choose wisely — your decisions affect admissibility in court.
+    </p>
+    <p>
+      Each scenario presents authentic artifacts: hex dumps, NTFS MFT records,
+      memory process trees, PCAP extracts, and mobile device logs.
+    </p>
+  </div>
+
+  <div id="title-topics-container" class="title-topics"></div>
+
+  <div class="flex gap-sm" style="justify-content: center; flex-wrap: wrap;">
+    <button id="btn-start" class="btn btn-primary">
+      <span class="btn-icon">▶</span> Start Investigation
+    </button>
+    <button id="btn-resume" class="btn btn-secondary hidden">
+      <span class="btn-icon">↻</span> Resume
+    </button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SCREEN 2 – CASE MAP (level selector)
+════════════════════════════════════════════════════════════ -->
+<div id="screen-map" class="screen">
+
+  <!-- In-game header -->
+  <header class="game-header">
+    <div class="game-header-left">
+      <span class="game-logo-small">🕵️</span>
+      <span class="game-title-small">CYBERFORENSICS: DIGITAL DETECTIVE</span>
+    </div>
+    <div class="game-header-stats">
+      <div class="stat-item">
+        <span class="stat-label">Total Score</span>
+        <span class="stat-value highlight" id="hdr-score">0</span>
+      </div>
+      <button id="btn-map-back" class="btn btn-secondary" style="padding: 0.4rem 0.9rem; font-size: 0.8rem;">
+        ← Main Menu
+      </button>
+    </div>
+  </header>
+
+  <h2 class="map-title" style="margin-top: 2rem;">Select Your Case</h2>
+  <p class="map-subtitle">Choose an investigation to begin. Complete all 6 cases to finish.</p>
+
+  <div id="scenarios-grid" class="scenarios-grid"></div>
+
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SCREEN 3 – ACTIVE INVESTIGATION (game play)
+════════════════════════════════════════════════════════════ -->
+<div id="screen-game" class="screen">
+
+  <!-- Top navigation bar -->
+  <header class="game-header">
+    <div class="game-header-left">
+      <span class="game-logo-small">🕵️</span>
+      <span class="game-title-small">CYBERFORENSICS: DIGITAL DETECTIVE</span>
+    </div>
+    <div class="game-header-stats">
+      <div class="stat-item">
+        <span class="stat-label">Case</span>
+        <span class="stat-value" id="hdr-case">1/6</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Score</span>
+        <span class="stat-value highlight" id="hdr-score-game">0</span>
+      </div>
+      <button id="btn-game-back" class="btn btn-secondary" style="padding: 0.4rem 0.9rem; font-size: 0.8rem;">
+        ← Cases
+      </button>
+    </div>
+  </header>
+
+  <!-- Two-column layout -->
+  <div class="game-body">
+
+    <!-- ── LEFT: Investigation Panel ── -->
+    <main class="investigation-panel">
+
+      <!-- Scene header -->
+      <div class="scene-header">
+        <div class="scene-icon-wrapper">
+          <span id="scene-icon" aria-hidden="true"></span>
+        </div>
+        <div class="scene-info">
+          <h2 id="scene-title-text"></h2>
+          <div id="scene-topic-tag"></div>
+        </div>
+      </div>
+
+      <!-- Narrative -->
+      <div class="narrative-box" id="narrative-box" aria-live="polite"></div>
+
+      <!-- Evidence Terminal -->
+      <div class="evidence-terminal">
+        <div class="terminal-titlebar">
+          <span class="terminal-dot dot-red"></span>
+          <span class="terminal-dot dot-yellow"></span>
+          <span class="terminal-dot dot-green"></span>
+          <span id="terminal-title">Evidence Viewer</span>
+        </div>
+        <div class="terminal-content" id="terminal-content" aria-label="Evidence terminal output"></div>
+      </div>
+
+      <!-- Question block -->
+      <div class="question-block" id="question-block">
+        <div id="question-label"></div>
+        <div class="question-text" id="question-text" aria-live="polite"></div>
+        <ul class="options-list" id="options-list" role="list" aria-label="Answer options"></ul>
+      </div>
+
+    </main>
+
+    <!-- ── RIGHT: Sidebar ── -->
+    <aside class="sidebar-panel" aria-label="Case information">
+
+      <div>
+        <div class="sidebar-section-title">Investigation Progress</div>
+        <div class="progress-steps" id="progress-steps"></div>
+      </div>
+
+      <div>
+        <div class="sidebar-section-title">Evidence Collected</div>
+        <div class="evidence-list" id="evidence-list"></div>
+      </div>
+
+      <div>
+        <div class="sidebar-section-title">Forensic Hint</div>
+        <div class="hint-box" id="hint-box"></div>
+      </div>
+
+      <div>
+        <div class="sidebar-section-title">Scenario Score</div>
+        <div class="score-display" id="scenario-score-display">
+          <div class="score-number">0</div>
+          <div class="score-label">0/0 pts</div>
+        </div>
+      </div>
+
+    </aside>
+
+  </div><!-- end .game-body -->
+
+</div><!-- end #screen-game -->
+
+<!-- ════════════════════════════════════════════════════════════
+     FEEDBACK OVERLAY (shown after answering)
+════════════════════════════════════════════════════════════ -->
+<div id="feedback-overlay" class="feedback-overlay hidden" role="dialog" aria-modal="true" aria-label="Answer feedback">
+  <div id="feedback-card" class="feedback-card">
+
+    <div id="feedback-icon" class="feedback-icon" aria-hidden="true"></div>
+    <h3 id="feedback-title" class="feedback-title"></h3>
+    <div id="feedback-points" class="feedback-points"></div>
+
+    <div class="feedback-explanation" id="feedback-explanation" aria-live="polite"></div>
+
+    <div class="feedback-concept">
+      <div class="feedback-concept-label">🎓 Forensic Concept</div>
+      <div class="feedback-concept-text" id="feedback-concept-text"></div>
+    </div>
+
+    <button id="btn-feedback-next" class="btn btn-primary" type="button">
+      ▶ Next Question
+    </button>
+
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SCREEN 4 – FINAL RESULTS
+════════════════════════════════════════════════════════════ -->
+<div id="screen-results" class="screen">
+
+  <div id="results-trophy" class="results-trophy">🏆</div>
+  <h2 class="results-title">Investigation Complete</h2>
+  <p class="results-subtitle">All 6 cases have been solved. Here is your performance summary.</p>
+
+  <div class="results-score-big" id="results-score-number">0</div>
+  <div class="results-score-label" id="results-score-max">/ 2400 pts</div>
+
+  <div id="results-grade" class="results-grade grade-A">A – Expert Analyst</div>
+  <p class="results-subtitle" id="results-grade-msg" style="margin-top: 0.5rem; margin-bottom: 1.5rem;"></p>
+
+  <div id="results-breakdown" class="results-breakdown"></div>
+
+  <div class="results-actions">
+    <button id="btn-results-replay" class="btn btn-primary" type="button">
+      🔄 Play Again
+    </button>
+    <button id="btn-results-map" class="btn btn-secondary" type="button">
+      🗺 Review Cases
+    </button>
+    <button id="btn-results-home" class="btn btn-secondary" type="button">
+      🏠 Main Menu
+    </button>
+  </div>
+
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     SCRIPTS (loaded at end for performance)
+════════════════════════════════════════════════════════════ -->
+<script src="js/scenarios.js"></script>
+<script src="js/game.js"></script>
+
+<!-- Sync the duplicate score element in the game header -->
+<script>
+  (function() {
+    // Keep both score elements in sync using a simple polling approach
+    // to avoid over-broad MutationObserver options
+    document.addEventListener('DOMContentLoaded', () => {
+      const main = document.getElementById('hdr-score');
+      const dup  = document.getElementById('hdr-score-game');
+      if (!main || !dup) return;
+      const observer = new MutationObserver(() => {
+        dup.textContent = main.textContent;
+      });
+      observer.observe(main, { childList: true, characterData: true });
+    });
+  })();
+</script>
+
+</body>
+</html>
