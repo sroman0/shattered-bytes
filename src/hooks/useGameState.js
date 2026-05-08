@@ -27,10 +27,14 @@ export default function useGameState() {
 
   // --- Workbench ---
   const [stashedChunks, setStashedChunks] = useState([]);
+  const [journalEntries, setJournalEntries] = useState([]);
 
   // --- Carving result ---
   const [carvedUrl, setCarvedUrl] = useState(null);
   const [carvedText, setCarvedText] = useState(null);
+  const [pendingCaseResult, setPendingCaseResult] = useState(null);
+  const [caseResults, setCaseResults] = useState([]);
+  const [latestCaseResult, setLatestCaseResult] = useState(null);
 
   // --- MBR unlock ---
   const [unlockedOffset, setUnlockedOffset] = useState(null);
@@ -45,6 +49,9 @@ export default function useGameState() {
   // --- Score & Timer ---
   const [score, setScore] = useState(0);
   const [totalScore, setTotalScore] = useState(0);
+  const [badSelections, setBadSelections] = useState(0);
+  const [carveAttempts, setCarveAttempts] = useState(0);
+  const [reportAttempts, setReportAttempts] = useState(0);
   const [levelStartTime, setLevelStartTime] = useState(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [hintsUsed, setHintsUsed] = useState(0);
@@ -81,6 +88,45 @@ export default function useGameState() {
     );
   }, []);
 
+  const getRangeRole = useCallback((start, end) => {
+    const solutions = levelData?.solution_offsets || [];
+    const exactIdx = solutions.findIndex(r => r.start === start && r.end === end);
+    if (exactIdx >= 0) {
+      return {
+        verdict: levelData?.metadata?.partial_recovery ? 'partial' : 'valid',
+        solutionIdx: exactIdx,
+        note: levelData?.metadata?.partial_recovery
+          ? 'Recoverable fragment. The original artefact has overwritten bytes.'
+          : 'Exact evidence range. Offset and length match the forensic answer key.',
+      };
+    }
+
+    const falsePositive = (levelData?.metadata?.false_positives || [])
+      .find(r => start <= r.end && end >= r.start);
+    if (falsePositive) {
+      return {
+        verdict: 'decoy',
+        solutionIdx: -1,
+        note: falsePositive.reason || 'Known false positive. Signature alone is not sufficient.',
+      };
+    }
+
+    const overlapIdx = solutions.findIndex(r => start <= r.end && end >= r.start);
+    if (overlapIdx >= 0) {
+      return {
+        verdict: 'overlap',
+        solutionIdx: overlapIdx,
+        note: 'Selection overlaps real evidence but includes missing or extra bytes.',
+      };
+    }
+
+    return {
+      verdict: 'unsupported',
+      solutionIdx: -1,
+      note: 'Unsupported range. No evidentiary relationship established.',
+    };
+  }, [levelData]);
+
   // --- Load Level ---
   const loadLevel = useCallback(async (idx) => {
     try {
@@ -98,11 +144,17 @@ export default function useGameState() {
       setSelectionStart(null);
       setSelectionEnd(null);
       setStashedChunks([]);
+      setJournalEntries([]);
       setCarvedUrl(null);
       setCarvedText(null);
+      setPendingCaseResult(null);
+      setLatestCaseResult(null);
       setUnlockedOffset(null);
       setHintsUsed(0);
       setCurrentHintIdx(0);
+      setBadSelections(0);
+      setCarveAttempts(0);
+      setReportAttempts(0);
       setObjectives(meta.objectives.map(o => ({ ...o, completed: false })));
 
       // Briefing
@@ -164,28 +216,47 @@ export default function useGameState() {
       size: sEnd - sStart + 1,
       opApplied: null,
     };
+    const assessment = getRangeRole(sStart, sEnd);
+    newChunk.verdict = assessment.verdict;
+    newChunk.solutionIdx = assessment.solutionIdx;
 
     setStashedChunks(prev => [...prev, newChunk]);
-    pushLog(`Fragment stashed: ${newChunk.size} bytes [0x${sStart.toString(16).toUpperCase()} — 0x${sEnd.toString(16).toUpperCase()}]`, 'success');
+    setJournalEntries(prev => [...prev, {
+      id: newChunk.id,
+      start: sStart,
+      end: sEnd,
+      size: newChunk.size,
+      verdict: assessment.verdict,
+      note: assessment.note,
+    }]);
 
-    // Auto-check objectives
-    const header = chunkHex.substring(0, 8).toUpperCase();
-    if (header === '89504E47') {
-      completeObjective('find_header');
-      completeObjective('find_chunk1');
+    const logType = ['valid', 'partial'].includes(assessment.verdict) ? 'success'
+      : assessment.verdict === 'overlap' ? 'warning'
+        : 'error';
+    pushLog(`Fragment stashed: ${newChunk.size} bytes [0x${sStart.toString(16).toUpperCase()} - 0x${sEnd.toString(16).toUpperCase()}]`, logType);
+    pushLog(`Journal assessment: ${assessment.note}`, logType);
+
+    if (['decoy', 'unsupported', 'overlap'].includes(assessment.verdict)) {
+      setBadSelections(prev => prev + 1);
     }
-    const footer = chunkHex.slice(-16).toUpperCase();
-    if (footer.includes('49454E44AE426082')) {
-      completeObjective('find_chunk2');
+
+    if (assessment.verdict === 'valid') {
+      if (currentLevel.difficulty === 'triage') {
+        completeObjective('find_header');
+        completeObjective('select_range');
+      }
+      if (currentLevel.difficulty === 'fragmented') {
+        completeObjective(assessment.solutionIdx === 0 ? 'find_chunk1' : 'find_chunk2');
+      }
     }
-    completeObjective('select_range');
-    completeObjective('stash_chunk');
-    completeObjective('stash_payload');
-    completeObjective('find_payload');
+
+    if (assessment.verdict === 'partial') {
+      completeObjective('find_partial');
+    }
 
     setSelectionStart(null);
     setSelectionEnd(null);
-  }, [selectionStart, selectionEnd, hexBytes, pushLog, completeObjective]);
+  }, [selectionStart, selectionEnd, hexBytes, pushLog, completeObjective, getRangeRole, currentLevel]);
 
   const removeStash = useCallback((id) => {
     setStashedChunks(prev => prev.filter(c => c.id !== id));
@@ -221,10 +292,98 @@ export default function useGameState() {
     completeObjective('decrypt');
   }, [stashedChunks, pushLog, completeObjective]);
 
+  const rangesMatchSolutions = useCallback(() => {
+    const solutions = levelData?.solution_offsets || [];
+    if (stashedChunks.length !== solutions.length) return false;
+    return stashedChunks.every((chunk, idx) =>
+      chunk.start === solutions[idx].start && chunk.end === solutions[idx].end
+    );
+  }, [levelData, stashedChunks]);
+
+  const closeCase = useCallback((reportKey) => {
+    if (!pendingCaseResult) {
+      pushLog('No carved artefact is awaiting a forensic conclusion.', 'error');
+      return;
+    }
+
+    const normalized = reportKey.trim().toLowerCase();
+    if (normalized !== pendingCaseResult.expectedReport) {
+      setReportAttempts(prev => prev + 1);
+      setBadSelections(prev => prev + 1);
+      pushLog(`Report rejected: "${normalized}" overstates or misclassifies the evidence.`, 'error');
+      return;
+    }
+
+    completeObjective(`report_${normalized}`);
+    if (normalized === 'partial') completeObjective('declare_limit');
+
+    if (timerRef.current) clearInterval(timerRef.current);
+    const timeElapsed = Math.floor((Date.now() - levelStartTime) / 1000);
+    const meta = CAMPAIGN[currentLevelIdx];
+    let levelScore = meta.maxScore;
+
+    levelScore -= hintsUsed * 15;
+    levelScore -= badSelections * 25;
+    levelScore -= Math.max(0, carveAttempts - 1) * 30;
+    levelScore -= reportAttempts * 40;
+
+    if (timeElapsed <= meta.timeBonusThreshold) {
+      const timeBonus = Math.round((1 - timeElapsed / meta.timeBonusThreshold) * 35);
+      levelScore += timeBonus;
+      pushLog(`Time bonus: +${timeBonus} points`, 'success');
+    }
+
+    levelScore = Math.max(0, levelScore);
+    const result = {
+      levelId: meta.id,
+      title: meta.title,
+      score: levelScore,
+      maxScore: meta.maxScore,
+      report: normalized,
+      status: pendingCaseResult.status,
+      hintsUsed,
+      badSelections,
+      carveAttempts,
+      elapsedTime: timeElapsed,
+      journalCount: journalEntries.length,
+    };
+
+    setScore(levelScore);
+    setTotalScore(prev => prev + levelScore);
+    setCompletedLevels(prev => prev.includes(currentLevelIdx) ? prev : [...prev, currentLevelIdx]);
+    setCaseResults(prev => [...prev, result]);
+    setLatestCaseResult(result);
+    setPendingCaseResult(null);
+
+    pushLog(`CASE CLOSED. Forensic conclusion accepted: ${normalized}. Score: ${levelScore}/${meta.maxScore}`, 'success');
+    setPhase(GAME_PHASE.VICTORY);
+  }, [
+    pendingCaseResult,
+    pushLog,
+    completeObjective,
+    levelStartTime,
+    currentLevelIdx,
+    hintsUsed,
+    badSelections,
+    carveAttempts,
+    reportAttempts,
+    journalEntries.length,
+  ]);
+
   // --- Carve ---
   const carveData = useCallback(() => {
     if (stashedChunks.length === 0) {
       pushLog('Workbench is empty. Stash fragments first.', 'error');
+      return;
+    }
+    setCarveAttempts(prev => prev + 1);
+
+    const exactRecovery = rangesMatchSolutions();
+    const partialRecovery = levelData?.metadata?.partial_recovery && exactRecovery;
+
+    if (!exactRecovery) {
+      setBadSelections(prev => prev + 1);
+      pushLog('Carve rejected: fragment set does not match the evidence map. Check range boundaries and order.', 'error');
       return;
     }
 
@@ -243,32 +402,20 @@ export default function useGameState() {
     }
 
     completeObjective('carve_file');
-    completeObjective('carve_flag');
-
-    // Calcolo punteggio
-    if (timerRef.current) clearInterval(timerRef.current);
-    const timeElapsed = Math.floor((Date.now() - levelStartTime) / 1000);
-    const meta = CAMPAIGN[currentLevelIdx];
-    let levelScore = meta.maxScore;
-
-    // Penalità hints
-    levelScore -= hintsUsed * 15;
-
-    // Bonus tempo
-    if (timeElapsed <= meta.timeBonusThreshold) {
-      const timeBonus = Math.round((1 - timeElapsed / meta.timeBonusThreshold) * 50);
-      levelScore += timeBonus;
-      pushLog(`Time bonus: +${timeBonus} points`, 'success');
+    if (currentLevel.difficulty === 'fragmented') {
+      completeObjective('order_chunks');
+    }
+    if (partialRecovery) {
+      completeObjective('declare_limit');
     }
 
-    levelScore = Math.max(0, levelScore);
-    setScore(levelScore);
-    setTotalScore(prev => prev + levelScore);
-    setCompletedLevels(prev => [...prev, currentLevelIdx]);
-
-    pushLog(`CASE CLOSED. Score: ${levelScore}/${meta.maxScore}`, 'success');
-    setPhase(GAME_PHASE.VICTORY);
-  }, [stashedChunks, levelData, currentLevelIdx, levelStartTime, hintsUsed, pushLog, completeObjective]);
+    const expectedReport = currentLevel.acceptedReport || (partialRecovery ? 'partial' : 'recovered');
+    setPendingCaseResult({
+      status: partialRecovery ? 'partial' : 'recovered',
+      expectedReport,
+    });
+    pushLog(`Payload validated. Submit final conclusion with: report ${expectedReport}`, 'warning');
+  }, [stashedChunks, levelData, pushLog, completeObjective, rangesMatchSolutions, currentLevel]);
 
   // --- Avanza al livello successivo ---
   const nextLevel = useCallback(() => {
@@ -309,6 +456,7 @@ export default function useGameState() {
         pushLog('  info              — Show current level metadata', 'info');
         pushLog('  hint              — Request an investigation hint (-15 pts)', 'info');
         pushLog('  xor <key>         — Apply XOR to workbench chunk (e.g. xor 0x1A)', 'info');
+        pushLog('  report <finding>  — Submit final finding: recovered | partial | inconclusive', 'info');
         pushLog('  clear             — Clear terminal output', 'info');
         pushLog('  status            — Show objectives and score', 'info');
         break;
@@ -358,10 +506,19 @@ export default function useGameState() {
         {
           const pattern = args.slice(1).join('').toUpperCase().replace(/\s/g, '');
           const joined = hexBytes.join('').toUpperCase();
-          const idx = joined.indexOf(pattern);
-          if (idx >= 0) {
-            const byteIdx = idx / 2;
-            pushLog(`Pattern found at byte offset ${byteIdx} (0x${byteIdx.toString(16).toUpperCase()})`, 'success');
+          const matches = [];
+          let from = 0;
+          while (matches.length < 8) {
+            const idx = joined.indexOf(pattern, from);
+            if (idx < 0) break;
+            matches.push(idx / 2);
+            from = idx + Math.max(2, pattern.length);
+          }
+          if (matches.length > 0) {
+            pushLog(`Pattern found ${matches.length}${matches.length === 8 ? '+' : ''} time(s):`, 'success');
+            matches.forEach(byteIdx => {
+              pushLog(`  offset ${byteIdx} (0x${byteIdx.toString(16).toUpperCase()})`, 'success');
+            });
           } else {
             pushLog(`Pattern "${pattern}" not found in current dump.`, 'error');
           }
@@ -373,6 +530,9 @@ export default function useGameState() {
           pushLog(`Level: ${levelData.difficulty} | Extension: .${levelData.target_extension} | Target size: ${levelData.target_size} bytes`, 'info');
           if (levelData.metadata?.mbr_present) pushLog('MBR detected at offset 0. Partition table at 0x1BE.', 'info');
           if (levelData.metadata?.xor_encoded) pushLog(`XOR encryption detected. Key: 0x${levelData.metadata.xor_key.toString(16).toUpperCase().padStart(2, '0')}`, 'warning');
+          if (levelData.metadata?.partial_recovery) {
+            pushLog(`Partial recovery: ${levelData.metadata.recoverable_size}/${levelData.metadata.original_size} bytes survived.`, 'warning');
+          }
         }
         break;
 
@@ -388,6 +548,14 @@ export default function useGameState() {
         applyXorOp(args[1]);
         break;
 
+      case 'report':
+        if (args.length < 2) {
+          pushLog('Usage: report <recovered|partial|inconclusive>', 'error');
+          break;
+        }
+        closeCase(args[1]);
+        break;
+
       case 'clear':
         setLogs([]);
         break;
@@ -397,13 +565,14 @@ export default function useGameState() {
         objectives.forEach(o => {
           pushLog(`  ${o.completed ? '[x]' : '[ ]'} ${o.text}`, o.completed ? 'success' : 'info');
         });
-        pushLog(`Hints used: ${hintsUsed} | Time: ${elapsedTime}s`, 'info');
+        pushLog(`Hints used: ${hintsUsed} | Bad leads: ${badSelections} | Carves: ${carveAttempts} | Time: ${elapsedTime}s`, 'info');
+        if (pendingCaseResult) pushLog(`Awaiting report: report ${pendingCaseResult.expectedReport}`, 'warning');
         break;
 
       default:
         pushLog(`Unknown command: "${args[0]}". Type "help" for available commands.`, 'error');
     }
-  }, [pushLog, levelData, hexBytes, objectives, hintsUsed, elapsedTime, completeObjective, useHint, applyXorOp]);
+  }, [pushLog, levelData, hexBytes, objectives, hintsUsed, badSelections, carveAttempts, elapsedTime, pendingCaseResult, closeCase, completeObjective, useHint, applyXorOp]);
 
   // --- Reset game ---
   const resetGame = useCallback(() => {
@@ -412,8 +581,15 @@ export default function useGameState() {
     setLevelData(null);
     setHexBytes([]);
     setCompletedLevels([]);
+    setCaseResults([]);
+    setLatestCaseResult(null);
+    setPendingCaseResult(null);
     setTotalScore(0);
     setScore(0);
+    setBadSelections(0);
+    setCarveAttempts(0);
+    setReportAttempts(0);
+    setJournalEntries([]);
     setLogs([
       { type: 'system', text: 'SHATTERED BYTES Forensic Framework v2.0' },
       { type: 'system', text: 'System reset. Awaiting operator input.' },
@@ -432,14 +608,20 @@ export default function useGameState() {
     selectionEnd,
     isSelecting,
     stashedChunks,
+    journalEntries,
     carvedUrl,
     carvedText,
+    pendingCaseResult,
+    caseResults,
+    latestCaseResult,
     unlockedOffset,
     logs,
     score,
     totalScore,
     elapsedTime,
     hintsUsed,
+    badSelections,
+    carveAttempts,
     objectives,
 
     // Actions

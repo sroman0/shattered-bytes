@@ -9,6 +9,7 @@ import Workbench from './components/Workbench';
 import HexEditor from './components/HexEditor';
 import AssetViewer from './components/AssetViewer';
 import ScoreBoard from './components/ScoreBoard';
+import EvidenceJournal from './components/EvidenceJournal';
 
 export default function App() {
   const game = useGameState();
@@ -45,6 +46,8 @@ export default function App() {
         objectives={game.objectives}
         hintsUsed={game.hintsUsed}
         elapsedTime={game.elapsedTime}
+        caseResults={game.caseResults}
+        latestCaseResult={game.latestCaseResult}
         onNext={game.nextLevel}
         onRestart={game.resetGame}
         isLastLevel={game.currentLevelIdx >= CAMPAIGN.length - 1}
@@ -64,7 +67,7 @@ export default function App() {
       <div className="flex-1 flex gap-3 p-3 min-h-0 overflow-hidden">
 
         {/* Left sidebar */}
-        <aside className="w-72 flex flex-col gap-3 shrink-0 overflow-y-auto min-h-0">
+        <aside className="w-72 flex flex-col gap-3 shrink-0 overflow-y-auto min-h-0 pr-1 pb-3">
           <MissionLog
             currentLevelIdx={game.currentLevelIdx}
             completedLevels={game.completedLevels}
@@ -90,6 +93,13 @@ export default function App() {
             onCarve={game.carveData}
             onXor={game.applyXorOp}
             levelData={game.levelData}
+          />
+
+          <EvidenceJournal
+            entries={game.journalEntries}
+            badSelections={game.badSelections}
+            carveAttempts={game.carveAttempts}
+            pendingCaseResult={game.pendingCaseResult}
           />
         </aside>
 
