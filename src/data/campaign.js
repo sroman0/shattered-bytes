@@ -60,22 +60,25 @@ export const CAMPAIGN = [
   },
   {
     id: 'level_3',
-    title: 'ACT 3: The Missing Tail',
-    subtitle: 'Partial recovery and defensible conclusion',
+    title: 'ACT 3: The Obscured Tail',
+    subtitle: 'Partial recovery, XOR deobfuscation, and defensible conclusion',
     difficulty: 'partial',
     briefing: [
       'The final artefact is a text note whose tail was overwritten after deletion.',
-      'A perfect recovery is impossible. The forensic task is to recover the remaining bytes and avoid overstating the conclusion.',
-      'Carve the recoverable fragment, then submit a calibrated conclusion with: report partial.',
+      'The surviving bytes were also weakly obfuscated with a single-byte XOR key recovered from malware triage notes.',
+      'A perfect recovery is impossible: recover the surviving range, apply XOR key 0x2A, carve the readable fragment, then submit: report partial.',
     ],
     objectives: [
-      { id: 'find_partial', text: 'Identify the recoverable text fragment', completed: false },
-      { id: 'carve_file', text: 'Carve the partial payload', completed: false },
+      { id: 'find_partial', text: 'Identify the recoverable obfuscated text fragment', completed: false },
+      { id: 'find_key', text: 'Identify the XOR key from the briefing/metadata', completed: false },
+      { id: 'decrypt', text: 'Apply XOR deobfuscation to the recovered fragment', completed: false },
+      { id: 'carve_file', text: 'Carve the partial readable payload', completed: false },
       { id: 'declare_limit', text: 'Recognise that the original file is incomplete', completed: false },
       { id: 'report_partial', text: 'Report a partial recovery without overclaiming', completed: false },
     ],
     hints: [
-      'Text fragments appear as readable ASCII in the right column.',
+      'The fragment is intentionally not readable before XOR deobfuscation.',
+      'Use the Workbench XOR field with key 0x2A after stashing the exact range.',
       'A missing tail means the correct conclusion is partial, not recovered.',
       'The report matters here as much as the byte selection.',
     ],
@@ -84,7 +87,7 @@ export const CAMPAIGN = [
     acceptedReport: 'partial',
     allowPartial: true,
     requires_mbr: false,
-    requires_xor: false,
+    requires_xor: true,
   },
 ];
 

@@ -341,6 +341,7 @@ export default function useGameState() {
       maxScore: meta.maxScore,
       report: normalized,
       status: pendingCaseResult.status,
+      obfuscationHandled: stashedChunks.some(chunk => chunk.opApplied?.startsWith('XOR')),
       hintsUsed,
       badSelections,
       carveAttempts,
@@ -368,6 +369,7 @@ export default function useGameState() {
     carveAttempts,
     reportAttempts,
     journalEntries.length,
+    stashedChunks,
   ]);
 
   // --- Carve ---

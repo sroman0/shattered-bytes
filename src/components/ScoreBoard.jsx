@@ -15,6 +15,34 @@ export default function ScoreBoard({
 }) {
   const formatTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
   const rate = (value, good, ok) => value <= good ? 'High' : value <= ok ? 'Medium' : 'Low';
+  const getMastery = (ratio, totals, handledPartial) => {
+    if (ratio >= 0.9 && totals.badSelections === 0 && handledPartial) {
+      return {
+        label: 'Forensic-ready',
+        className: 'text-green-400',
+        note: 'Precise byte work, disciplined validation, and calibrated reporting.',
+      };
+    }
+    if (ratio >= 0.72 && totals.badSelections <= 2 && handledPartial) {
+      return {
+        label: 'Competent examiner',
+        className: 'text-cyan-400',
+        note: 'Solid recovery workflow with minor inefficiencies or avoidable uncertainty.',
+      };
+    }
+    if (ratio >= 0.5) {
+      return {
+        label: 'Developing analyst',
+        className: 'text-yellow-400',
+        note: 'Core concepts are present, but the workflow still shows trial-and-error or weak reporting control.',
+      };
+    }
+    return {
+      label: 'Needs remediation',
+      className: 'text-red-400',
+      note: 'Evidence handling or conclusions were too imprecise for a defensible forensic workflow.',
+    };
+  };
 
   if (phase === GAME_PHASE.CAMPAIGN_END) {
     const totals = caseResults.reduce((acc, r) => {
@@ -25,6 +53,10 @@ export default function ScoreBoard({
       return acc;
     }, { badSelections: 0, carveAttempts: 0, hintsUsed: 0, elapsedTime: 0 });
     const partialHandled = caseResults.some(r => r.report === 'partial');
+    const maxTotal = caseResults.reduce((sum, r) => sum + r.maxScore, 0);
+    const masteryRatio = maxTotal > 0 ? totalScore / maxTotal : 0;
+    const mastery = getMastery(masteryRatio, totals, partialHandled);
+    const extraCarves = Math.max(0, totals.carveAttempts - caseResults.length);
 
     return (
       <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 backdrop-blur-sm">
@@ -40,12 +72,19 @@ export default function ScoreBoard({
             <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-1">Total Score</div>
           </div>
 
+          <div className="bg-gray-950/50 border border-cyan-800/40 rounded-lg p-4 mb-5">
+            <div className="text-[10px] text-gray-500 uppercase tracking-wider">Mastery Level</div>
+            <div className={`text-xl font-bold mt-1 ${mastery.className}`}>{mastery.label}</div>
+            <p className="text-xs text-gray-400 mt-2 leading-relaxed">{mastery.note}</p>
+          </div>
+
           <div className="grid grid-cols-2 gap-3 mb-5">
             {[
               ['Signature recognition', rate(totals.badSelections, 0, 2)],
-              ['Offset precision', rate(totals.carveAttempts - caseResults.length, 0, 1)],
-              ['Fragment reconstruction', caseResults.length >= 2 ? 'High' : 'Medium'],
-              ['Trial-and-error discipline', rate(totals.badSelections + totals.carveAttempts - caseResults.length, 0, 2)],
+              ['Offset precision', rate(extraCarves, 0, 1)],
+              ['Fragment reconstruction', caseResults.some(r => r.title.includes('Fracture')) ? 'High' : 'Medium'],
+              ['Trial-and-error discipline', rate(totals.badSelections + extraCarves, 0, 2)],
+              ['Obfuscation handling', caseResults.some(r => r.obfuscationHandled) ? 'High' : 'Medium'],
               ['Forensic reasoning', partialHandled ? 'High' : 'Medium'],
               ['Reporting quality', caseResults.every(r => ['recovered', 'partial'].includes(r.report)) ? 'High' : 'Medium'],
             ].map(([label, value]) => (

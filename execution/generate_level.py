@@ -127,9 +127,11 @@ def generate_level(input_path, output_path, difficulty="triage", noise_size=2048
         }]
 
     elif difficulty == "partial":
-        # Act 3: only the initial part of the evidence survived overwriting.
+        # Act 3: only the initial part survived, and those bytes are weakly obfuscated.
         recoverable_size = max(12, int(len(file_bytes) * 0.65))
         recovered = file_bytes[:recoverable_size]
+        xor_key = 0x2A
+        obfuscated_recovered = apply_xor(recovered, xor_key)
         overwritten = generate_noise(len(file_bytes) - recoverable_size)
 
         prefix_noise_size = random.randint(160, noise_size // 2)
@@ -137,7 +139,7 @@ def generate_level(input_path, output_path, difficulty="triage", noise_size=2048
 
         full_buffer = (
             generate_noise(prefix_noise_size)
-            + recovered
+            + obfuscated_recovered
             + overwritten
             + generate_noise(middle_noise_size)
         )
@@ -149,6 +151,8 @@ def generate_level(input_path, output_path, difficulty="triage", noise_size=2048
         metadata["original_size"] = file_size
         metadata["recoverable_size"] = len(recovered)
         metadata["overwritten_bytes"] = file_size - len(recovered)
+        metadata["xor_encoded"] = True
+        metadata["xor_key"] = xor_key
 
     elif difficulty == "mbr":
         # Case 3: MBR Parsing
