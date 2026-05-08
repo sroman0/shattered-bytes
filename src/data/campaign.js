@@ -65,12 +65,12 @@ export const CAMPAIGN = [
     difficulty: 'partial',
     briefing: [
       'The final artefact is a text note whose tail was overwritten after deletion.',
-      'The surviving bytes were also weakly obfuscated with a single-byte XOR key recovered from malware triage notes.',
-      'A perfect recovery is impossible: recover the surviving range, apply XOR key 0x2A, carve the readable fragment, then submit: report partial.',
+      'The surviving bytes were also weakly obfuscated with a single-byte XOR. Malware triage suggests the plaintext likely starts with "RANSOMWARE_PAYLOAD".',
+      'A perfect recovery is impossible: recover the surviving range, derive the XOR key from known plaintext, carve the readable fragment, then submit: report partial.',
     ],
     objectives: [
       { id: 'find_partial', text: 'Identify the recoverable obfuscated text fragment', completed: false },
-      { id: 'find_key', text: 'Identify the XOR key from the briefing/metadata', completed: false },
+      { id: 'find_key', text: 'Derive the XOR key from known plaintext', completed: false },
       { id: 'decrypt', text: 'Apply XOR deobfuscation to the recovered fragment', completed: false },
       { id: 'carve_file', text: 'Carve the partial readable payload', completed: false },
       { id: 'declare_limit', text: 'Recognise that the original file is incomplete', completed: false },
@@ -78,7 +78,8 @@ export const CAMPAIGN = [
     ],
     hints: [
       'The fragment is intentionally not readable before XOR deobfuscation.',
-      'Use the Workbench XOR field with key 0x2A after stashing the exact range.',
+      'For single-byte XOR, plaintext_byte XOR ciphertext_byte reveals the key.',
+      'The first ciphertext byte of the correct fragment is 0x78. The expected plaintext first byte is ASCII "R" = 0x52.',
       'A missing tail means the correct conclusion is partial, not recovered.',
       'The report matters here as much as the byte selection.',
     ],

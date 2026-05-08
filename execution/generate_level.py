@@ -6,6 +6,7 @@ import random
 import binascii
 
 MAX_FILE_SIZE = 500 * 1024 # Increased to 500 KB for React Virtual Scrolling
+HEX_VIEW_PAGE_SIZE = 1024
 
 def generate_noise(size):
     """Generates random bytes"""
@@ -14,6 +15,13 @@ def generate_noise(size):
 def apply_xor(data_bytes, key_byte):
     """Apply XOR encryption to bytes using a single key byte"""
     return bytes([b ^ key_byte for b in data_bytes])
+
+def page_padding(current_offset, artefact_size):
+    """Return padding needed so an artefact does not cross a hex-editor page."""
+    page_pos = current_offset % HEX_VIEW_PAGE_SIZE
+    if page_pos + artefact_size <= HEX_VIEW_PAGE_SIZE:
+        return 0
+    return HEX_VIEW_PAGE_SIZE - page_pos
 
 def generate_mbr(partition_offset):
     """Generates a dummy MBR (Master Boot Record) with a single partition starting at partition_offset."""
@@ -74,15 +82,18 @@ def generate_level(input_path, output_path, difficulty="triage", noise_size=2048
         second_noise_size = random.randint(192, max(256, noise_size // 3))
         suffix_noise_size = noise_size - min(noise_size, first_noise_size + second_noise_size)
 
+        start_offset = first_noise_size + len(decoy) + second_noise_size
+        align_padding = page_padding(start_offset, len(file_bytes))
+        start_offset += align_padding
+
         full_buffer = (
             generate_noise(first_noise_size)
             + decoy
             + generate_noise(second_noise_size)
+            + generate_noise(align_padding)
             + file_bytes
             + generate_noise(max(128, suffix_noise_size))
         )
-
-        start_offset = first_noise_size + len(decoy) + second_noise_size
         end_offset = start_offset + len(file_bytes) - 1
         solution_offsets.append({"start": start_offset, "end": end_offset})
         metadata["false_positives"] = [{
@@ -102,20 +113,26 @@ def generate_level(input_path, output_path, difficulty="triage", noise_size=2048
         n2_size = random.randint(300, noise_size // 2)
         n3_size = noise_size - (n1_size + n2_size)
 
+        start1 = 96 + len(decoy) + n1_size
+        pad1 = page_padding(start1, len(chunk1))
+        start1 += pad1
+        end1 = start1 + len(chunk1) - 1
+        start2 = end1 + 1 + n2_size
+        pad2 = page_padding(start2, len(chunk2))
+        start2 += pad2
+        end2 = start2 + len(chunk2) - 1
+
         full_buffer = (
             generate_noise(96)
             + decoy
             + generate_noise(n1_size)
+            + generate_noise(pad1)
             + chunk1
             + generate_noise(n2_size)
+            + generate_noise(pad2)
             + chunk2
             + generate_noise(max(128, n3_size))
         )
-
-        start1 = 96 + len(decoy) + n1_size
-        end1 = start1 + len(chunk1) - 1
-        start2 = end1 + 1 + n2_size
-        end2 = start2 + len(chunk2) - 1
 
         solution_offsets.append({"start": start1, "end": end1})
         solution_offsets.append({"start": start2, "end": end2})
@@ -137,14 +154,16 @@ def generate_level(input_path, output_path, difficulty="triage", noise_size=2048
         prefix_noise_size = random.randint(160, noise_size // 2)
         middle_noise_size = random.randint(64, max(96, noise_size // 4))
 
+        start_offset = prefix_noise_size
+        align_padding = page_padding(start_offset, len(obfuscated_recovered))
+        start_offset += align_padding
         full_buffer = (
             generate_noise(prefix_noise_size)
+            + generate_noise(align_padding)
             + obfuscated_recovered
             + overwritten
             + generate_noise(middle_noise_size)
         )
-
-        start_offset = prefix_noise_size
         end_offset = prefix_noise_size + len(recovered) - 1
         solution_offsets.append({"start": start_offset, "end": end_offset})
         metadata["partial_recovery"] = True

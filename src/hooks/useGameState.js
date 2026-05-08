@@ -179,10 +179,8 @@ export default function useGameState() {
       pushLog('WARNING: Sectors beyond MBR are encrypted. Parse partition table and use "go <offset>" to unlock.', 'error');
     }
     if (currentLevel.requires_xor) {
-      const key = levelData?.metadata?.xor_key;
-      if (key !== undefined) {
-        pushLog(`INTEL: Malware analysis reports XOR key = 0x${key.toString(16).toUpperCase().padStart(2, '0')} (decimal: ${key})`, 'warning');
-      }
+      pushLog('INTEL: Single-byte XOR obfuscation suspected. Derive the key from known plaintext.', 'warning');
+      pushLog('KNOWN PLAINTEXT: recovered note likely starts with "RANSOMWARE_PAYLOAD".', 'info');
     }
   }, [currentLevel, hexBytes.length, levelData, pushLog]);
 
@@ -458,6 +456,7 @@ export default function useGameState() {
         pushLog('  info              — Show current level metadata', 'info');
         pushLog('  hint              — Request an investigation hint (-15 pts)', 'info');
         pushLog('  xor <key>         — Apply XOR to workbench chunk (e.g. xor 0x1A)', 'info');
+        pushLog('  xorcalc <a> <b>   — XOR two bytes to derive a key (e.g. xorcalc 0x78 0x52)', 'info');
         pushLog('  report <finding>  — Submit final finding: recovered | partial | inconclusive', 'info');
         pushLog('  clear             — Clear terminal output', 'info');
         pushLog('  status            — Show objectives and score', 'info');
@@ -531,7 +530,9 @@ export default function useGameState() {
         if (levelData) {
           pushLog(`Level: ${levelData.difficulty} | Extension: .${levelData.target_extension} | Target size: ${levelData.target_size} bytes`, 'info');
           if (levelData.metadata?.mbr_present) pushLog('MBR detected at offset 0. Partition table at 0x1BE.', 'info');
-          if (levelData.metadata?.xor_encoded) pushLog(`XOR encryption detected. Key: 0x${levelData.metadata.xor_key.toString(16).toUpperCase().padStart(2, '0')}`, 'warning');
+          if (levelData.metadata?.xor_encoded) {
+            pushLog('XOR obfuscation detected. Key is not provided; use known plaintext and xorcalc.', 'warning');
+          }
           if (levelData.metadata?.partial_recovery) {
             pushLog(`Partial recovery: ${levelData.metadata.recoverable_size}/${levelData.metadata.original_size} bytes survived.`, 'warning');
           }
@@ -548,6 +549,29 @@ export default function useGameState() {
           break;
         }
         applyXorOp(args[1]);
+        break;
+
+      case 'xorcalc':
+        if (args.length < 3) {
+          pushLog('Usage: xorcalc <byte_a> <byte_b> (e.g. xorcalc 0x78 0x52)', 'error');
+          break;
+        }
+        {
+          const parseByte = (value) => {
+            const parsed = value.startsWith('0x') ? parseInt(value, 16) : parseInt(value, 10);
+            if (Number.isNaN(parsed) || parsed < 0 || parsed > 255) return null;
+            return parsed;
+          };
+          const a = parseByte(args[1]);
+          const b = parseByte(args[2]);
+          if (a === null || b === null) {
+            pushLog('xorcalc expects byte values between 0 and 255.', 'error');
+            break;
+          }
+          const out = a ^ b;
+          pushLog(`0x${a.toString(16).toUpperCase().padStart(2, '0')} XOR 0x${b.toString(16).toUpperCase().padStart(2, '0')} = 0x${out.toString(16).toUpperCase().padStart(2, '0')} (${out})`, 'success');
+          if (currentLevel.requires_xor) completeObjective('find_key');
+        }
         break;
 
       case 'report':
@@ -574,7 +598,7 @@ export default function useGameState() {
       default:
         pushLog(`Unknown command: "${args[0]}". Type "help" for available commands.`, 'error');
     }
-  }, [pushLog, levelData, hexBytes, objectives, hintsUsed, badSelections, carveAttempts, elapsedTime, pendingCaseResult, closeCase, completeObjective, useHint, applyXorOp]);
+  }, [pushLog, levelData, hexBytes, objectives, hintsUsed, badSelections, carveAttempts, elapsedTime, pendingCaseResult, closeCase, currentLevel, completeObjective, useHint, applyXorOp]);
 
   // --- Reset game ---
   const resetGame = useCallback(() => {

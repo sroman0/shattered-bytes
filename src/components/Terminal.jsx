@@ -4,8 +4,22 @@ export default function Terminal({ logs, onCommand }) {
   const [input, setInput] = useState('');
   const [history, setHistory] = useState([]);
   const [historyIdx, setHistoryIdx] = useState(-1);
+  const [showGuide, setShowGuide] = useState(false);
   const endRef = useRef(null);
   const inputRef = useRef(null);
+
+  const commands = [
+    ['help', 'Print the command list in the terminal log.'],
+    ['search <hex>', 'Find byte-pattern offsets, e.g. search 89504E47.'],
+    ['info', 'Show metadata for the current evidence dump.'],
+    ['status', 'Show objectives, hints, attempts, and time.'],
+    ['hint', 'Request the next hint with score penalty.'],
+    ['xorcalc <a> <b>', 'XOR two bytes to derive a key, e.g. xorcalc 0x78 0x52.'],
+    ['xor <key>', 'Apply XOR to the current Workbench fragment.'],
+    ['report recovered', 'Submit a complete-recovery finding.'],
+    ['report partial', 'Submit a partial-recovery finding.'],
+    ['clear', 'Clear the terminal output.'],
+  ];
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -70,12 +84,44 @@ export default function Terminal({ logs, onCommand }) {
           </svg>
           Terminal
         </h2>
-        <div className="flex gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-full bg-red-500/70" />
-          <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/70" />
-          <div className="w-2.5 h-2.5 rounded-full bg-green-500/70" />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowGuide(prev => !prev)}
+            className={`text-[10px] px-2 py-1 rounded border transition-colors uppercase tracking-wider
+              ${showGuide
+                ? 'bg-cyan-900/40 border-cyan-600/50 text-cyan-300'
+                : 'bg-gray-800/60 border-gray-700/60 text-gray-400 hover:text-cyan-300 hover:border-cyan-700/60'
+              }`}
+            title="Show terminal command guide"
+          >
+            Commands
+          </button>
+          <div className="flex gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-red-500/70" />
+            <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/70" />
+            <div className="w-2.5 h-2.5 rounded-full bg-green-500/70" />
+          </div>
         </div>
       </div>
+
+      {showGuide && (
+        <div className="shrink-0 border-b border-cyan-900/40 bg-cyan-950/20 px-3 py-2">
+          <div className="text-[10px] text-cyan-400 uppercase tracking-wider font-bold mb-1.5">
+            Terminal Command Guide
+          </div>
+          <div className="space-y-1 max-h-44 overflow-y-auto pr-1">
+            {commands.map(([command, description]) => (
+              <div key={command} className="grid grid-cols-[112px_1fr] gap-2 text-[10px] leading-relaxed">
+                <code className="text-green-300 bg-black/30 border border-gray-800 rounded px-1.5 py-0.5 whitespace-nowrap">
+                  {command}
+                </code>
+                <span className="text-gray-400">{description}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div
         className="flex-1 overflow-y-auto p-3 text-xs font-mono space-y-0.5 bg-black/60 cursor-text min-h-0"
