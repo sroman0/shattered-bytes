@@ -10,11 +10,11 @@ export default function Header({ totalScore, elapsedTime, phase, GAME_PHASE }) {
       <div className="flex items-center gap-4">
         <div className="flex flex-col">
           <h1 className="text-xl font-bold tracking-[0.3em] text-green-400 leading-tight"
-              style={{ textShadow: '0 0 10px rgba(74,222,128,0.5), 0 0 20px rgba(74,222,128,0.2)' }}>
+            style={{ textShadow: '0 0 10px rgba(74,222,128,0.5), 0 0 20px rgba(74,222,128,0.2)' }}>
             SHATTERED_BYTES
           </h1>
           <p className="text-[10px] text-green-600/80 tracking-[0.2em] uppercase">
-            Digital Forensics Investigation Framework
+            Digital Forensics Investigation Game
           </p>
         </div>
       </div>
@@ -38,7 +38,7 @@ export default function Header({ totalScore, elapsedTime, phase, GAME_PHASE }) {
         </div>
 
         <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"
-             style={{ boxShadow: '0 0 8px rgba(74,222,128,0.8)' }} />
+          style={{ boxShadow: '0 0 8px rgba(74,222,128,0.8)' }} />
       </div>
     </header>
   );

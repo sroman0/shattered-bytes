@@ -92,7 +92,7 @@ export default function Workbench({ chunks, onRemove, onMove, onCarve, onXor, le
               />
               <button
                 onClick={() => { onXor(xorInput); setXorInput(''); }}
-                disabled={chunks.length !== 1 || !xorInput.trim()}
+                disabled={chunks.length === 0 || !xorInput.trim()}
                 className="bg-purple-800/50 hover:bg-purple-700/60 border border-purple-600/50 text-purple-300 px-3 py-1.5 rounded text-xs transition-all disabled:opacity-30 disabled:cursor-not-allowed font-bold"
               >
                 DECRYPT

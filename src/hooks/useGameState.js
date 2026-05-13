@@ -39,6 +39,10 @@ export default function useGameState() {
   // --- MBR unlock ---
   const [unlockedOffset, setUnlockedOffset] = useState(null);
 
+  // --- Go-to-offset trigger for HexEditor navigation (object so duplicates re-trigger) ---
+  const [goToOffsetTrigger, setGoToOffsetTrigger] = useState(null);
+  const triggerGoTo = useCallback((offset) => setGoToOffsetTrigger({ offset, ts: Date.now() }), []);
+
   // --- Terminal logs ---
   const [logs, setLogs] = useState([
     { type: 'system', text: 'SHATTERED BYTES Forensic Framework v2.0' },
@@ -179,8 +183,12 @@ export default function useGameState() {
       pushLog('WARNING: Sectors beyond MBR are encrypted. Parse partition table and use "go <offset>" to unlock.', 'error');
     }
     if (currentLevel.requires_xor) {
-      pushLog('INTEL: Single-byte XOR obfuscation suspected. Derive the key from known plaintext.', 'warning');
-      pushLog('KNOWN PLAINTEXT: recovered note likely starts with "RANSOMWARE_PAYLOAD".', 'info');
+      const hint = levelData?.metadata?.known_plaintext_hint;
+      if (hint) {
+        pushLog(`INTEL: Single-byte XOR obfuscation suspected. Known plaintext starts with "${hint}".`, 'warning');
+      } else {
+        pushLog('INTEL: Single-byte XOR obfuscation suspected. Derive the key from known plaintext.', 'warning');
+      }
     }
   }, [currentLevel, hexBytes.length, levelData, pushLog]);
 
@@ -239,12 +247,24 @@ export default function useGameState() {
     }
 
     if (assessment.verdict === 'valid') {
-      if (currentLevel.difficulty === 'triage') {
+      const diff = currentLevel.difficulty;
+      if (diff === 'triage') {
         completeObjective('find_header');
         completeObjective('select_range');
       }
-      if (currentLevel.difficulty === 'fragmented') {
+      if (diff === 'fragmented') {
         completeObjective(assessment.solutionIdx === 0 ? 'find_chunk1' : 'find_chunk2');
+      }
+      if (diff === 'multi_sig') {
+        completeObjective('identify_target');
+        completeObjective('avoid_pdf');
+        completeObjective('select_range');
+      }
+      if (diff === 'ransomware') {
+        const chunkNames = ['find_chunk1', 'find_chunk2', 'find_chunk3'];
+        if (assessment.solutionIdx >= 0 && assessment.solutionIdx < chunkNames.length) {
+          completeObjective(chunkNames[assessment.solutionIdx]);
+        }
       }
     }
 
@@ -272,8 +292,8 @@ export default function useGameState() {
 
   // --- XOR Operation ---
   const applyXorOp = useCallback((keyInput) => {
-    if (stashedChunks.length !== 1) {
-      pushLog('XOR requires exactly one chunk in the Workbench.', 'error');
+    if (stashedChunks.length === 0) {
+      pushLog('Workbench is empty. Stash fragments first.', 'error');
       return;
     }
     const key = parseXorKey(keyInput);
@@ -282,10 +302,12 @@ export default function useGameState() {
       return;
     }
 
-    const chunk = stashedChunks[0];
-    const decrypted = applyXor(chunk.hex, key);
-    setStashedChunks([{ ...chunk, hex: decrypted, opApplied: `XOR 0x${key.toString(16).toUpperCase().padStart(2, '0')}` }]);
-    pushLog(`XOR decryption applied: key=0x${key.toString(16).toUpperCase().padStart(2, '0')}`, 'success');
+    // Apply XOR to all chunks in workbench
+    setStashedChunks(prev => prev.map(chunk => {
+      const decrypted = applyXor(chunk.hex, key);
+      return { ...chunk, hex: decrypted, opApplied: `XOR 0x${key.toString(16).toUpperCase().padStart(2, '0')}` };
+    }));
+    pushLog(`XOR decryption applied to ${stashedChunks.length} chunk(s): key=0x${key.toString(16).toUpperCase().padStart(2, '0')}`, 'success');
     completeObjective('find_key');
     completeObjective('decrypt');
   }, [stashedChunks, pushLog, completeObjective]);
@@ -484,6 +506,7 @@ export default function useGameState() {
           if (levelData?.difficulty === 'mbr') {
             if (offset === levelData.metadata.target_offset_encoded) {
               setUnlockedOffset(offset);
+              triggerGoTo(offset);
               pushLog(`SECTOR UNLOCKED at offset ${offset} (0x${offset.toString(16).toUpperCase()})`, 'success');
               pushLog('Encrypted sectors are now readable. Proceed with carving.', 'success');
               completeObjective('read_mbr');
@@ -494,6 +517,7 @@ export default function useGameState() {
               pushLog(`ACCESS DENIED: Offset ${offset} is incorrect. Review your Little-Endian calculation.`, 'error');
             }
           } else {
+            triggerGoTo(offset);
             pushLog(`Navigating to offset ${offset} (0x${offset.toString(16).toUpperCase()})`, 'info');
           }
         }
@@ -598,7 +622,7 @@ export default function useGameState() {
       default:
         pushLog(`Unknown command: "${args[0]}". Type "help" for available commands.`, 'error');
     }
-  }, [pushLog, levelData, hexBytes, objectives, hintsUsed, badSelections, carveAttempts, elapsedTime, pendingCaseResult, closeCase, currentLevel, completeObjective, useHint, applyXorOp]);
+  }, [pushLog, levelData, hexBytes, objectives, hintsUsed, badSelections, carveAttempts, elapsedTime, pendingCaseResult, closeCase, currentLevel, completeObjective, useHint, applyXorOp, triggerGoTo]);
 
   // --- Reset game ---
   const resetGame = useCallback(() => {
@@ -641,6 +665,7 @@ export default function useGameState() {
     caseResults,
     latestCaseResult,
     unlockedOffset,
+    goToOffsetTrigger,
     logs,
     score,
     totalScore,

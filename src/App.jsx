@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import useGameState from './hooks/useGameState';
 import Header from './components/Header';
 import MainMenu from './components/MainMenu';
@@ -10,10 +11,13 @@ import HexEditor from './components/HexEditor';
 import AssetViewer from './components/AssetViewer';
 import ScoreBoard from './components/ScoreBoard';
 import EvidenceJournal from './components/EvidenceJournal';
+import SignatureReference from './components/SignatureReference';
+import ForensicNotepad from './components/ForensicNotepad';
 
 export default function App() {
   const game = useGameState();
   const { GAME_PHASE, CAMPAIGN } = game;
+  const [hasNotes, setHasNotes] = useState(false);
 
   // --- Main Menu ---
   if (game.phase === GAME_PHASE.MENU) {
@@ -86,6 +90,10 @@ export default function App() {
             />
           )}
 
+          <SignatureReference />
+
+          <ForensicNotepad onNoteChange={(text) => setHasNotes(text.length > 0)} />
+
           <Workbench
             chunks={game.stashedChunks}
             onRemove={game.removeStash}
@@ -115,6 +123,8 @@ export default function App() {
             onStash={game.stashSelection}
             unlockedOffset={game.unlockedOffset}
             levelData={game.levelData}
+            goToOffsetTrigger={game.goToOffsetTrigger}
+            stashedChunks={game.stashedChunks}
           />
 
           <AssetViewer

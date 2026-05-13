@@ -3,3 +3,6 @@ GEMINI.md
 
 // Ignore the solution file
 WALKTHROUGH.md
+
+// Ignore the temporary files
+tmp/

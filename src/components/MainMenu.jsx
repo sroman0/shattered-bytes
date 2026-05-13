@@ -1,3 +1,5 @@
+import { CAMPAIGN } from '../data/campaign';
+
 export default function MainMenu({ onStart, completedLevels, totalScore }) {
   return (
     <div className="h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden">
@@ -37,7 +39,7 @@ export default function MainMenu({ onStart, completedLevels, totalScore }) {
         </p>
         <p className="text-gray-600 text-xs mb-8 max-w-md mx-auto">
           Master hex analysis, file signature recognition, MBR parsing, and XOR decryption
-          through 4 progressive forensic investigation cases.
+          through {CAMPAIGN.length} progressive forensic investigation cases.
         </p>
 
         {/* Stats if returning */}
@@ -49,7 +51,7 @@ export default function MainMenu({ onStart, completedLevels, totalScore }) {
             </div>
             <div className="w-px h-8 bg-gray-800" />
             <div className="text-center">
-              <div className="text-lg font-bold text-green-400 tabular-nums">{completedLevels.length}/4</div>
+              <div className="text-lg font-bold text-green-400 tabular-nums">{completedLevels.length}/{CAMPAIGN.length}</div>
               <div className="text-[9px] text-gray-600 uppercase">Cases</div>
             </div>
           </div>

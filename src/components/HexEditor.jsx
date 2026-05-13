@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   BYTES_PER_ROW,
   ROWS_PER_PAGE,
@@ -20,6 +20,8 @@ export default function HexEditor({
   onStash,
   unlockedOffset,
   levelData,
+  goToOffsetTrigger,
+  stashedChunks,
 }) {
   const [currentPage, setCurrentPage] = useState(0);
 
@@ -41,6 +43,23 @@ export default function HexEditor({
     const page = getPageForOffset(offset);
     goToPage(page);
   }, [goToPage]);
+
+  // External navigation trigger from terminal "go <offset>"
+  useEffect(() => {
+    if (goToOffsetTrigger && goToOffsetTrigger.offset !== undefined) {
+      goToOffset(goToOffsetTrigger.offset);
+    }
+  }, [goToOffsetTrigger, goToOffset]);
+
+  // False positive ranges from level metadata
+  const falsePositives = useMemo(() => {
+    return levelData?.metadata?.false_positives || [];
+  }, [levelData]);
+
+  // Stashed decoy ranges (for visual feedback after stashing)
+  const stashedDecoyRanges = useMemo(() => {
+    return (stashedChunks || []).filter(c => c.verdict === 'decoy').map(c => ({ start: c.start, end: c.end }));
+  }, [stashedChunks]);
 
   // MBR obfuscation check
   const isMbrLevel = levelData?.difficulty === 'mbr';
@@ -142,6 +161,7 @@ export default function HexEditor({
                       {rowBytes.map((byte, bIdx) => {
                         const absIdx = absOffset + bIdx;
                         const isSelected = absIdx >= sStart && absIdx <= sEnd;
+                        const isDecoy = stashedDecoyRanges.some(r => absIdx >= r.start && absIdx <= r.end);
                         return (
                           <div
                             key={bIdx}
@@ -150,7 +170,9 @@ export default function HexEditor({
                             className={`w-7 text-center cursor-crosshair transition-colors duration-0
                               ${isSelected
                                 ? 'bg-blue-500/80 text-white rounded-sm'
-                                : 'hover:bg-gray-700/40 text-green-300/80'
+                                : isDecoy
+                                  ? 'bg-red-900/30 text-red-400/70'
+                                  : 'hover:bg-gray-700/40 text-green-300/80'
                               }`}
                             style={isSelected ? { boxShadow: '0 0 4px rgba(59,130,246,0.5)' } : {}}
                           >
@@ -169,11 +191,13 @@ export default function HexEditor({
                       {rowBytes.map((byte, bIdx) => {
                         const absIdx = absOffset + bIdx;
                         const isSelected = absIdx >= sStart && absIdx <= sEnd;
+                        const isDecoy = stashedDecoyRanges.some(r => absIdx >= r.start && absIdx <= r.end);
                         return (
                           <span
                             key={`a-${bIdx}`}
                             className={`inline-block w-[10px] text-center transition-colors duration-0
-                              ${isSelected ? 'bg-blue-500/60 text-white rounded-sm' : ''}`}
+                              ${isSelected ? 'bg-blue-500/60 text-white rounded-sm'
+                                : isDecoy ? 'text-red-400/50' : ''}`}
                           >
                             {getAsciiChar(byte)}
                           </span>
