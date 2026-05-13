@@ -8,10 +8,10 @@ export const CAMPAIGN = [
     subtitle: 'Contiguous carving with evidence validation',
     difficulty: 'triage',
     briefing: [
-      'You are examining a verified forensic image of a seized USB drive.',
-      'Intelligence says a small PNG proof file was deleted before seizure, but the dump contains a deliberate false signature.',
-      'Do not trust the first magic number blindly: verify that the selected range has a coherent header, footer, and size.',
-      'After carving, submit a report conclusion with the terminal: report recovered.',
+      'You are examining a forensic image from a seized laptop belonging to a ransomware operator.',
+      'Intelligence confirms the suspect deleted a screenshot of an encrypted chat log used to coordinate a cryptocurrency ransom payment. A PNG copy was present on the drive before seizure.',
+      'Anti-forensics: the suspect planted a fake PNG header (decoy) earlier in the dump to mislead investigators. Do not trust the first magic number — verify header AND footer.',
+      'After carving the genuine evidence, submit a report conclusion with the terminal: report recovered.',
     ],
     forensicConcept: {
       title: 'File Signatures & Magic Numbers',
@@ -47,8 +47,9 @@ export const CAMPAIGN = [
     subtitle: 'Fragmented reconstruction and ordering',
     difficulty: 'fragmented',
     briefing: [
-      'The same USB image contains a second deleted artefact stored in non-contiguous clusters.',
-      'The first fragment contains the PNG header; the second fragment contains the footer. Garbage bytes between them are not part of the file.',
+      'The suspect\'s SSD used TRIM, causing file data to be scattered across non-contiguous disk sectors.',
+      'A scanned image of a forged identity document — used to open fraudulent bank accounts — was split into two fragments during deletion. The first fragment contains the PNG header, the second contains the footer.',
+      'Garbage bytes between fragments are unrelated disk residue and must NOT be included in the reconstruction.',
       'Stash both fragments in the Workbench, keep their forensic order, carve the composed stream, then report recovered.',
     ],
     forensicConcept: {
@@ -87,9 +88,9 @@ export const CAMPAIGN = [
     subtitle: 'Multi-signature triage — identify the correct target format',
     difficulty: 'multi_sig',
     briefing: [
-      'Multiple file artefacts are embedded in this forensic image. Intelligence specifies the target is a JPEG photograph — ignore other file types.',
-      'You will encounter a complete PDF document and a truncated JPEG header. Neither is the target.',
-      'Locate the genuine JPEG image (starts with FF D8 FF, ends with FF D9), carve it, and report recovered.',
+      'An ATM skimming investigation has yielded a disk image from the suspect\'s laptop. Intelligence specifies the target is a JPEG still frame from CCTV surveillance footage showing the suspect at the compromised ATM.',
+      'The dump contains a complete PDF document (an unrelated police report) and a truncated JPEG header planted as a decoy. Neither is the evidence you need.',
+      'Locate the genuine CCTV surveillance JPEG (starts with FF D8 FF, ends with FF D9), carve it, and report recovered.',
     ],
     forensicConcept: {
       title: 'Signature-Based Carving & File Format Diversity',
@@ -127,10 +128,10 @@ export const CAMPAIGN = [
     subtitle: 'Parse the MBR partition table to unlock hidden sectors',
     difficulty: 'mbr',
     briefing: [
-      'This image begins with a Master Boot Record. The evidence is stored in a partition whose location is encoded in the MBR partition table.',
+      'A forensic image from a corporate accountant\'s seized hard drive. The drive uses a traditional MBR partition layout. A screenshot proving fraudulent wire transfers was hidden inside the NTFS partition.',
       'Read the partition table at offset 0x1BE. Each entry is 16 bytes. The LBA start address is at bytes 8-11 of each entry, stored in Little-Endian format.',
       'Calculate the byte offset (LBA_start × sector_size) and use the terminal command "go <offset>" to unlock the target sector. The sector size for this dump is 32 bytes.',
-      'After unlocking, locate and carve the PNG file, then report recovered.',
+      'After unlocking, locate and carve the PNG evidence of the suspicious bank transfer, then report recovered.',
     ],
     forensicConcept: {
       title: 'Master Boot Record & Partition Tables',

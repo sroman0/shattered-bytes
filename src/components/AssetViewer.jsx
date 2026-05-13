@@ -1,5 +1,20 @@
-export default function AssetViewer({ carvedUrl, carvedText }) {
+import { useState } from 'react';
+
+// Map level IDs to full-size evidence images in public/evidence/
+const EVIDENCE_IMAGE_MAP = {
+  level_1: '/evidence/evidence_chat.png',
+  level_2: '/evidence/evidence_document.png',
+  level_3: '/evidence/evidence_surveillance.png',
+  level_4: '/evidence/evidence_transaction.png',
+};
+
+export default function AssetViewer({ carvedUrl, carvedText, currentLevelId }) {
   const hasContent = carvedUrl || carvedText;
+  const [showFullSize, setShowFullSize] = useState(false);
+
+  // For image levels, after carving show the full-size evidence image
+  const fullSizeUrl = currentLevelId ? EVIDENCE_IMAGE_MAP[currentLevelId] : null;
+  const displayImageUrl = fullSizeUrl && carvedUrl ? fullSizeUrl : carvedUrl;
 
   return (
     <div className="bg-gray-900/80 border border-gray-800 rounded-lg overflow-hidden flex flex-col">
@@ -19,7 +34,7 @@ export default function AssetViewer({ carvedUrl, carvedText }) {
         </h2>
       </div>
 
-      <div className="flex-1 bg-black/50 p-3 flex items-center justify-center min-h-[120px]">
+      <div className="flex-1 bg-black/50 p-3 flex flex-col items-center justify-center min-h-[120px]">
         {!hasContent && (
           <div className="text-center">
             <div className="text-gray-700 text-2xl mb-2">◇</div>
@@ -39,13 +54,56 @@ export default function AssetViewer({ carvedUrl, carvedText }) {
           </div>
         )}
 
-        {carvedUrl && (
-          <img
-            src={carvedUrl}
-            alt="Carved Data"
-            className="max-w-full max-h-full object-contain rounded border border-green-500/30"
-            style={{ imageRendering: 'pixelated' }}
-          />
+        {displayImageUrl && (
+          <div className="w-full flex flex-col items-center gap-2">
+            {/* Evidence label */}
+            <div className="flex items-center gap-2 w-full">
+              <div className="text-[10px] text-gray-500 uppercase tracking-wider">Recovered Evidence</div>
+              {fullSizeUrl && (
+                <div className="text-[9px] text-emerald-600 ml-auto">
+                  Enhanced reconstruction from carved bytes
+                </div>
+              )}
+            </div>
+
+            {/* Image container with click-to-expand */}
+            <div
+              className="relative w-full bg-gray-950/60 rounded-lg border border-green-500/20 overflow-hidden cursor-pointer group"
+              onClick={() => setShowFullSize(!showFullSize)}
+            >
+              <img
+                src={displayImageUrl}
+                alt="Recovered Evidence"
+                className="w-full h-auto object-contain rounded"
+                style={{
+                  maxHeight: showFullSize ? '500px' : '200px',
+                  transition: 'max-height 0.4s ease-in-out',
+                }}
+              />
+              {/* Scanline overlay for forensic feel */}
+              <div
+                className="absolute inset-0 pointer-events-none opacity-10"
+                style={{
+                  backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,128,0.03) 2px, rgba(0,255,128,0.03) 4px)',
+                }}
+              />
+              {/* Expand/collapse hint */}
+              <div className="absolute bottom-2 right-2 text-[9px] text-gray-500 bg-gray-900/80 px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                {showFullSize ? 'Click to collapse' : 'Click to expand'}
+              </div>
+            </div>
+
+            {/* Metadata bar */}
+            <div className="flex items-center gap-3 text-[9px] text-gray-600 w-full">
+              <span className="font-mono">
+                {currentLevelId?.replace('level_', 'ACT ')}
+              </span>
+              <span className="text-gray-700">|</span>
+              <span className="text-green-600">INTEGRITY: VERIFIED</span>
+              <span className="text-gray-700">|</span>
+              <span>Click image to {showFullSize ? 'collapse' : 'expand'}</span>
+            </div>
+          </div>
         )}
       </div>
     </div>

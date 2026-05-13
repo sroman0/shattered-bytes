@@ -12,13 +12,24 @@ const GAME_PHASE = {
   CAMPAIGN_END: 'campaign_end',
 };
 
+// Load saved progress from localStorage
+const loadSavedProgress = () => {
+  try {
+    const saved = localStorage.getItem('shattered_bytes_save');
+    if (saved) return JSON.parse(saved);
+  } catch (e) { /* ignore */ }
+  return null;
+};
+
 export default function useGameState() {
+  const savedProgress = loadSavedProgress();
+
   // --- Fase e progressione ---
   const [phase, setPhase] = useState(GAME_PHASE.MENU);
   const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
   const [levelData, setLevelData] = useState(null);
   const [hexBytes, setHexBytes] = useState([]);
-  const [completedLevels, setCompletedLevels] = useState([]);
+  const [completedLevels, setCompletedLevels] = useState(savedProgress?.completedLevels || []);
 
   // --- Selezione hex ---
   const [selectionStart, setSelectionStart] = useState(null);
@@ -33,7 +44,7 @@ export default function useGameState() {
   const [carvedUrl, setCarvedUrl] = useState(null);
   const [carvedText, setCarvedText] = useState(null);
   const [pendingCaseResult, setPendingCaseResult] = useState(null);
-  const [caseResults, setCaseResults] = useState([]);
+  const [caseResults, setCaseResults] = useState(savedProgress?.caseResults || []);
   const [latestCaseResult, setLatestCaseResult] = useState(null);
 
   // --- MBR unlock ---
@@ -50,9 +61,25 @@ export default function useGameState() {
     { type: 'info', text: 'Type "help" for available commands.' },
   ]);
 
+  // --- Investigation Timeline ---
+  const [timelineEvents, setTimelineEvents] = useState([]);
+  const timelineCountRef = useRef(0);
+
+  const addTimelineEvent = useCallback((type, text) => {
+    const now = new Date();
+    const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    timelineCountRef.current += 1;
+    setTimelineEvents(prev => [...prev, {
+      id: timelineCountRef.current,
+      type,
+      text,
+      time,
+    }]);
+  }, []);
+
   // --- Score & Timer ---
   const [score, setScore] = useState(0);
-  const [totalScore, setTotalScore] = useState(0);
+  const [totalScore, setTotalScore] = useState(savedProgress?.totalScore || 0);
   const [badSelections, setBadSelections] = useState(0);
   const [carveAttempts, setCarveAttempts] = useState(0);
   const [reportAttempts, setReportAttempts] = useState(0);
@@ -160,6 +187,8 @@ export default function useGameState() {
       setCarveAttempts(0);
       setReportAttempts(0);
       setObjectives(meta.objectives.map(o => ({ ...o, completed: false })));
+      setTimelineEvents([]);
+      timelineCountRef.current = 0;
 
       // Briefing
       setPhase(GAME_PHASE.BRIEFING);
@@ -241,6 +270,7 @@ export default function useGameState() {
         : 'error';
     pushLog(`Fragment stashed: ${newChunk.size} bytes [0x${sStart.toString(16).toUpperCase()} - 0x${sEnd.toString(16).toUpperCase()}]`, logType);
     pushLog(`Journal assessment: ${assessment.note}`, logType);
+    addTimelineEvent('stash', `Stashed ${newChunk.size}B [0x${sStart.toString(16).toUpperCase()}]`);
 
     if (['decoy', 'unsupported', 'overlap'].includes(assessment.verdict)) {
       setBadSelections(prev => prev + 1);
@@ -308,6 +338,7 @@ export default function useGameState() {
       return { ...chunk, hex: decrypted, opApplied: `XOR 0x${key.toString(16).toUpperCase().padStart(2, '0')}` };
     }));
     pushLog(`XOR decryption applied to ${stashedChunks.length} chunk(s): key=0x${key.toString(16).toUpperCase().padStart(2, '0')}`, 'success');
+    addTimelineEvent('xor', `XOR decrypt key=0x${key.toString(16).toUpperCase().padStart(2, '0')}`);
     completeObjective('find_key');
     completeObjective('decrypt');
   }, [stashedChunks, pushLog, completeObjective]);
@@ -370,11 +401,25 @@ export default function useGameState() {
     };
 
     setScore(levelScore);
-    setTotalScore(prev => prev + levelScore);
-    setCompletedLevels(prev => prev.includes(currentLevelIdx) ? prev : [...prev, currentLevelIdx]);
-    setCaseResults(prev => [...prev, result]);
+    const newTotal = totalScore + levelScore;
+    setTotalScore(newTotal);
+    const newCompleted = completedLevels.includes(currentLevelIdx) ? completedLevels : [...completedLevels, currentLevelIdx];
+    setCompletedLevels(newCompleted);
+    const newResults = [...caseResults, result];
+    setCaseResults(newResults);
     setLatestCaseResult(result);
     setPendingCaseResult(null);
+    addTimelineEvent('report', `Case closed: ${normalized} (${levelScore}/${meta.maxScore})`);
+
+    // Save progress to localStorage
+    try {
+      localStorage.setItem('shattered_bytes_save', JSON.stringify({
+        completedLevels: newCompleted,
+        totalScore: newTotal,
+        caseResults: newResults,
+        savedAt: new Date().toISOString(),
+      }));
+    } catch (e) { /* ignore storage errors */ }
 
     pushLog(`CASE CLOSED. Forensic conclusion accepted: ${normalized}. Score: ${levelScore}/${meta.maxScore}`, 'success');
     setPhase(GAME_PHASE.VICTORY);
@@ -417,10 +462,12 @@ export default function useGameState() {
       setCarvedText(result.text);
       setCarvedUrl(null);
       pushLog(`Text payload extracted: "${result.text.substring(0, 50)}${result.text.length > 50 ? '...' : ''}"`, 'success');
+      addTimelineEvent('carve', `Text carved: ${result.text.length} chars`);
     } else if (result.url) {
       setCarvedUrl(result.url);
       setCarvedText(null);
       pushLog('Binary payload carved. Object rendered in Asset Viewer.', 'success');
+      addTimelineEvent('carve', 'Binary payload carved');
     }
 
     completeObjective('carve_file');
@@ -458,6 +505,7 @@ export default function useGameState() {
     }
     pushLog(`HINT: ${meta.hints[currentHintIdx]}`, 'warning');
     setHintsUsed(prev => prev + 1);
+    addTimelineEvent('hint', `Hint used (${currentHintIdx + 1}/${meta.hints.length})`);
     setCurrentHintIdx(prev => prev + 1);
   }, [currentLevelIdx, currentHintIdx, pushLog]);
 
@@ -508,6 +556,7 @@ export default function useGameState() {
               setUnlockedOffset(offset);
               triggerGoTo(offset);
               pushLog(`SECTOR UNLOCKED at offset ${offset} (0x${offset.toString(16).toUpperCase()})`, 'success');
+              addTimelineEvent('navigate', `Sector unlocked at 0x${offset.toString(16).toUpperCase()}`);
               pushLog('Encrypted sectors are now readable. Proceed with carving.', 'success');
               completeObjective('read_mbr');
               completeObjective('find_lba');
@@ -519,6 +568,7 @@ export default function useGameState() {
           } else {
             triggerGoTo(offset);
             pushLog(`Navigating to offset ${offset} (0x${offset.toString(16).toUpperCase()})`, 'info');
+            addTimelineEvent('navigate', `Go to 0x${offset.toString(16).toUpperCase()}`);
           }
         }
         break;
@@ -544,8 +594,10 @@ export default function useGameState() {
             matches.forEach(byteIdx => {
               pushLog(`  offset ${byteIdx} (0x${byteIdx.toString(16).toUpperCase()})`, 'success');
             });
+            addTimelineEvent('search', `Found ${pattern} at ${matches.length} offset(s)`);
           } else {
             pushLog(`Pattern "${pattern}" not found in current dump.`, 'error');
+            addTimelineEvent('search', `No match: ${pattern}`);
           }
         }
         break;
@@ -640,11 +692,44 @@ export default function useGameState() {
     setCarveAttempts(0);
     setReportAttempts(0);
     setJournalEntries([]);
+    setTimelineEvents([]);
+    timelineCountRef.current = 0;
+    try { localStorage.removeItem('shattered_bytes_save'); } catch (e) { /* ignore */ }
     setLogs([
       { type: 'system', text: 'SHATTERED BYTES Forensic Framework v2.0' },
       { type: 'system', text: 'System reset. Awaiting operator input.' },
     ]);
   }, []);
+
+  // --- Return to menu (preserve progress) ---
+  const returnToMenu = useCallback(() => {
+    setPhase(GAME_PHASE.MENU);
+    // Only clear current-level state, keep progress
+    setLevelData(null);
+    setHexBytes([]);
+    setLatestCaseResult(null);
+    setPendingCaseResult(null);
+    setScore(0);
+    setBadSelections(0);
+    setCarveAttempts(0);
+    setReportAttempts(0);
+    setSelectionStart(null);
+    setSelectionEnd(null);
+    setIsSelecting(false);
+    setStashedChunks([]);
+    setCarvedUrl(null);
+    setCarvedText(null);
+    setUnlockedOffset(null);
+    setJournalEntries([]);
+    setObjectives([]);
+    setElapsedTime(0);
+    setHintsUsed(0);
+    setLogs([
+      { type: 'system', text: 'SHATTERED BYTES Forensic Framework v2.0' },
+      { type: 'info', text: `Progress saved. ${completedLevels.length} cases completed. Score: ${totalScore}.` },
+      { type: 'system', text: 'Returned to main menu.' },
+    ]);
+  }, [completedLevels.length, totalScore]);
 
   return {
     // State
@@ -674,6 +759,7 @@ export default function useGameState() {
     badSelections,
     carveAttempts,
     objectives,
+    timelineEvents,
 
     // Actions
     loadLevel,
@@ -691,6 +777,7 @@ export default function useGameState() {
     executeCommand,
     pushLog,
     resetGame,
+    returnToMenu,
 
     // Constants
     GAME_PHASE,

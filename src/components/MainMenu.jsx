@@ -1,6 +1,8 @@
 import { CAMPAIGN } from '../data/campaign';
 
-export default function MainMenu({ onStart, completedLevels, totalScore }) {
+export default function MainMenu({ onStart, onHowToPlay, completedLevels, totalScore }) {
+  const hasProgress = completedLevels.length > 0;
+
   return (
     <div className="h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden">
       {/* Background grid effect */}
@@ -43,7 +45,7 @@ export default function MainMenu({ onStart, completedLevels, totalScore }) {
         </p>
 
         {/* Stats if returning */}
-        {completedLevels.length > 0 && (
+        {hasProgress && (
           <div className="flex items-center justify-center gap-6 mb-8 text-xs">
             <div className="text-center">
               <div className="text-lg font-bold text-yellow-400 tabular-nums">{totalScore}</div>
@@ -57,15 +59,42 @@ export default function MainMenu({ onStart, completedLevels, totalScore }) {
           </div>
         )}
 
-        <button
-          onClick={onStart}
-          className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white font-bold py-3.5 px-12 rounded-lg text-sm transition-all tracking-[0.2em] uppercase"
-          style={{ boxShadow: '0 0 25px rgba(74,222,128,0.2), 0 0 50px rgba(74,222,128,0.05)' }}
-        >
-          {completedLevels.length > 0 ? 'Continue Investigation' : 'Begin Investigation'}
-        </button>
+        {/* Menu buttons */}
+        <div className="flex flex-col items-center gap-3 max-w-xs mx-auto">
+          {/* Primary: Start or Continue */}
+          <button
+            onClick={onStart}
+            className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white font-bold py-3.5 px-12 rounded-lg text-sm transition-all tracking-[0.2em] uppercase"
+            style={{ boxShadow: '0 0 25px rgba(74,222,128,0.2), 0 0 50px rgba(74,222,128,0.05)' }}
+          >
+            {hasProgress ? 'Continue' : 'Start Game'}
+          </button>
 
-        <div className="mt-12 text-[9px] text-gray-700 space-y-1">
+          {/* How to Play */}
+          <button
+            onClick={onHowToPlay}
+            className="w-full bg-gray-800/60 hover:bg-gray-700/60 text-cyan-400 hover:text-cyan-300 font-bold py-3 px-12 rounded-lg text-sm transition-all tracking-[0.15em] uppercase border border-gray-700/50 hover:border-cyan-800/50"
+          >
+            How to Play
+          </button>
+
+          {/* New Game (only if progress exists) */}
+          {hasProgress && (
+            <button
+              onClick={() => {
+                if (window.confirm('Start a new game? Your current progress will be lost.')) {
+                  try { localStorage.removeItem('shattered_bytes_save'); } catch {}
+                  window.location.reload();
+                }
+              }}
+              className="w-full bg-transparent hover:bg-gray-800/40 text-gray-600 hover:text-gray-400 font-bold py-2.5 px-12 rounded-lg text-xs transition-all tracking-[0.15em] uppercase border border-gray-800/50 hover:border-gray-700/50"
+            >
+              New Game
+            </button>
+          )}
+        </div>
+
+        <div className="mt-10 text-[9px] text-gray-700 space-y-1">
           <p>Computer Forensics and Cyber Crime Analysis — Serious Game Project</p>
           <p>Built with React + Python | Data Carving Educational Framework</p>
         </div>
