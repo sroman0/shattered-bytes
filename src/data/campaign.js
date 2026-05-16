@@ -1,5 +1,18 @@
 // Campagna completa da 10-15 minuti: un caso investigativo in 6 atti progressivi.
 
+export const STORY = {
+  operation: 'OPERATION SHATTERED MERIDIAN',
+  agency: 'Digital Forensics Division',
+  playerRole: 'Junior forensic analyst assigned to Agent Root',
+  antagonist: 'Night Meridian ransomware cell',
+  premise:
+    'A regional hospital network has been hit by Night Meridian. The live breach is contained, but the payment channel, mule identities, and exfiltration path are still buried in seized devices.',
+  stakes:
+    'You have one lab session to turn raw bytes into defensible evidence before the incident command team decides whether to notify banks, arrest the mule, and warn the affected victims.',
+  finalReport:
+    'The reconstructed evidence links the ransom channel, forged identity, ATM cash-out, fraudulent transfer, ransomware payload, and exfiltrated credentials into one defensible incident chain.',
+};
+
 export const CAMPAIGN = [
   // ─── ACT 1 ─── Contiguous PNG carving with false positive ──────
   {
@@ -7,12 +20,15 @@ export const CAMPAIGN = [
     title: 'ACT 1: Intake and False Lead',
     subtitle: 'Contiguous carving with evidence validation',
     difficulty: 'triage',
+    caseNote: '03:14 UTC. Incident command receives a seized laptop from a suspected Night Meridian negotiator. Agent Root assigns you the first triage pass: prove whether the chat screenshot still exists.',
     briefing: [
-      'You are examining a forensic image from a seized laptop belonging to a ransomware operator.',
-      'Intelligence confirms the suspect deleted a screenshot of an encrypted chat log used to coordinate a cryptocurrency ransom payment. A PNG copy was present on the drive before seizure.',
+      'You are examining a forensic image from a seized laptop belonging to a Night Meridian ransomware negotiator.',
+      'Intelligence confirms the suspect deleted a screenshot of an encrypted chat log used to coordinate a cryptocurrency ransom payment against the hospital network. A PNG copy was present on the drive before seizure.',
       'Anti-forensics: the suspect planted a fake PNG header (decoy) earlier in the dump to mislead investigators. Do not trust the first magic number — verify header AND footer.',
       'After carving the genuine evidence, submit a report conclusion with the terminal: report recovered.',
     ],
+    debrief:
+      'The recovered chat log confirms the ransom wallet and gives the task force its first reliable thread: Night Meridian used a document mule to move money after negotiation.',
     forensicConcept: {
       title: 'File Signatures & Magic Numbers',
       paragraphs: [
@@ -46,12 +62,15 @@ export const CAMPAIGN = [
     title: 'ACT 2: The Fracture',
     subtitle: 'Fragmented reconstruction and ordering',
     difficulty: 'fragmented',
+    caseNote: 'The wallet lead points to a forged identity packet used to open intermediary bank accounts. The file survived deletion, but not contiguously.',
     briefing: [
       'The suspect\'s SSD used TRIM, causing file data to be scattered across non-contiguous disk sectors.',
-      'A scanned image of a forged identity document — used to open fraudulent bank accounts — was split into two fragments during deletion. The first fragment contains the PNG header, the second contains the footer.',
+      'A scanned image of a forged identity document — used by Night Meridian to open fraudulent bank accounts — was split into two fragments during deletion. The first fragment contains the PNG header, the second contains the footer.',
       'Garbage bytes between fragments are unrelated disk residue and must NOT be included in the reconstruction.',
       'Stash both fragments in the Workbench, keep their forensic order, carve the composed stream, then report recovered.',
     ],
+    debrief:
+      'The reconstructed identity scan gives investigators a mule alias. Bank telemetry now ties that alias to a cash-out attempt at a compromised ATM.',
     forensicConcept: {
       title: 'File Fragmentation on Disk',
       paragraphs: [
@@ -87,11 +106,14 @@ export const CAMPAIGN = [
     title: 'ACT 3: Signal and Noise',
     subtitle: 'Multi-signature triage — identify the correct target format',
     difficulty: 'multi_sig',
+    caseNote: 'The mule alias appears in bank surveillance metadata. Your dump contains several recoverable artefacts, but only one can place the suspect at the ATM.',
     briefing: [
-      'An ATM skimming investigation has yielded a disk image from the suspect\'s laptop. Intelligence specifies the target is a JPEG still frame from CCTV surveillance footage showing the suspect at the compromised ATM.',
+      'An ATM skimming investigation has yielded a disk image from the suspect\'s laptop. Intelligence specifies the target is a JPEG still frame from CCTV surveillance footage showing the mule at the compromised ATM.',
       'The dump contains a complete PDF document (an unrelated police report) and a truncated JPEG header planted as a decoy. Neither is the evidence you need.',
       'Locate the genuine CCTV surveillance JPEG (starts with FF D8 FF, ends with FF D9), carve it, and report recovered.',
     ],
+    debrief:
+      'The CCTV frame connects the forged identity to a real-world cash-out. The next warrant targets a corporate accountant suspected of laundering the transfer.',
     forensicConcept: {
       title: 'Signature-Based Carving & File Format Diversity',
       paragraphs: [
@@ -127,12 +149,15 @@ export const CAMPAIGN = [
     title: 'ACT 4: Partition Archaeology',
     subtitle: 'Parse the MBR partition table to unlock hidden sectors',
     difficulty: 'mbr',
+    caseNote: 'The accountant tried to hide banking evidence inside an old partition layout. The file is not gone; it is behind an offset calculation.',
     briefing: [
-      'A forensic image from a corporate accountant\'s seized hard drive. The drive uses a traditional MBR partition layout. A screenshot proving fraudulent wire transfers was hidden inside the NTFS partition.',
+      'You receive a forensic image from the corporate accountant\'s seized hard drive. The drive uses a traditional MBR partition layout. A screenshot proving fraudulent wire transfers was hidden inside the NTFS partition.',
       'Read the partition table at offset 0x1BE. Each entry is 16 bytes. The LBA start address is at bytes 8-11 of each entry, stored in Little-Endian format.',
       'Calculate the byte offset (LBA_start × sector_size) and use the terminal command "go <offset>" to unlock the target sector. The sector size for this dump is 32 bytes.',
       'After unlocking, locate and carve the PNG evidence of the suspicious bank transfer, then report recovered.',
     ],
+    debrief:
+      'The bank transfer screenshot closes the money trail. Agent Root now pivots from laundering to attribution: recover the ransomware configuration itself.',
     forensicConcept: {
       title: 'Master Boot Record & Partition Tables',
       paragraphs: [
@@ -172,12 +197,15 @@ export const CAMPAIGN = [
     title: 'ACT 5: The Obscured Tail',
     subtitle: 'Partial recovery, XOR deobfuscation, and defensible conclusion',
     difficulty: 'partial',
+    caseNote: 'Malware triage finds a deleted configuration block from the Night Meridian loader. It may expose the payload family, but the tail has been overwritten.',
     briefing: [
-      'The final text artefact was partially overwritten after deletion. The surviving bytes were also weakly obfuscated with a single-byte XOR.',
+      'A text artefact from the ransomware loader was partially overwritten after deletion. The surviving bytes were also weakly obfuscated with a single-byte XOR.',
       'Malware triage suggests the plaintext likely starts with "RANSOMWARE_PAYLOAD".',
       'A perfect recovery is impossible: recover the surviving range, derive the XOR key from known plaintext, carve the readable fragment, then submit: report partial.',
       'Warning: a decoy XOR-encoded block exists in the dump. Verify your selection against the known plaintext before committing.',
     ],
+    debrief:
+      'The partial payload is enough to identify the ransomware branch, but not enough to overclaim. The final dump may still contain the credentials used for exfiltration.',
     forensicConcept: {
       title: 'XOR Obfuscation & Known-Plaintext Attacks',
       paragraphs: [
@@ -216,12 +244,15 @@ export const CAMPAIGN = [
     title: 'ACT 6: Ransomware Aftermath',
     subtitle: 'Multi-fragment XOR recovery with forensic triage',
     difficulty: 'ransomware',
+    caseNote: 'The last image comes from a staging server. If the credential fragments can be reconstructed, the response team can notify victims and revoke the compromised accounts.',
     briefing: [
-      'A ransomware incident has left encrypted credential fragments scattered across this dump. The attacker used single-byte XOR with an unknown key.',
+      'The Night Meridian incident left encrypted credential fragments scattered across this dump. The attacker used single-byte XOR with an unknown key.',
       'Intelligence suggests the plaintext begins with "EXFILTRATED_CREDENTIALS". Use this to derive the XOR key.',
       'Three separate fragments must be recovered and assembled in order. Decoy artefacts include a corrupted PNG header and a fake credential block encoded with a different XOR key.',
       'After XOR decryption, carve the reassembled payload and report recovered.',
     ],
+    debrief:
+      'The recovered credentials confirm exfiltration and give incident command the account list needed for containment, victim notification, and prosecution.',
     forensicConcept: {
       title: 'Incident Response & Multi-Artefact Triage',
       paragraphs: [

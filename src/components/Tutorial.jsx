@@ -16,13 +16,13 @@ const TUTORIAL_STEPS = [
   {
     title: 'Selecting & Stashing Bytes',
     icon: '🎯',
-    content: 'Click and drag in the hex editor to select a range of bytes. Then click "Stash" to add the selection to your Workbench. You can stash multiple fragments and reorder them by dragging.',
-    tip: 'Precision matters. Selecting extra or missing bytes will affect your score.',
+    content: 'Select bytes by dragging, by shift-clicking the endpoint, or by entering start/end offsets in Range Select. Then click "Stash" to add the selection to your Workbench. You can stash multiple fragments and reorder them by dragging.',
+    tip: 'For long ranges, use Range Select or the terminal command select <start> <end> so exact boundaries do not depend on scrolling.',
   },
   {
     title: 'The Terminal',
     icon: '💻',
-    content: 'The terminal on the right provides forensic commands. Use "search <hex>" to find patterns, "go <offset>" to navigate, "info" for level metadata, and "hint" for guidance.',
+    content: 'The terminal on the right provides forensic commands. Use "search <hex>" to find patterns, "go <offset>" to navigate, "select <start> <end>" for exact ranges, "info" for level metadata, and "hint" for guidance.',
     tip: 'Type "help" in the terminal to see all available commands.',
   },
   {

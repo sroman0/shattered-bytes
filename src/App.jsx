@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import IntroVideo from './components/IntroVideo';
 import useGameState from './hooks/useGameState';
 import BootSequence from './components/BootSequence';
 import Tutorial from './components/Tutorial';
@@ -22,6 +23,9 @@ export default function App() {
   const { GAME_PHASE, CAMPAIGN } = game;
   const [hasNotes, setHasNotes] = useState(false);
   const [showBoot, setShowBoot] = useState(true);
+  const [showIntro, setShowIntro] = useState(() => {
+    try { return localStorage.getItem('shattered_bytes_intro_seen') !== '1'; } catch { return true; }
+  });
   const [showTutorial, setShowTutorial] = useState(false);
   const [tutorialSeen, setTutorialSeen] = useState(() => {
     try { return localStorage.getItem('shattered_bytes_tutorial_seen') === '1'; } catch { return false; }
@@ -68,6 +72,14 @@ export default function App() {
   // --- Boot Sequence ---
   if (showBoot) {
     return <BootSequence onComplete={handleBootComplete} />;
+  }
+
+  // --- Intro Video (plays once after boot) ---
+  if (showIntro) {
+    return <IntroVideo onComplete={() => {
+      setShowIntro(false);
+      try { localStorage.setItem('shattered_bytes_intro_seen', '1'); } catch { /* ignore */ }
+    }} />;
   }
 
   // --- Tutorial overlay ---

@@ -20,7 +20,31 @@ export default function HexEditor({
   stashedChunks,
 }) {
   const scrollRef = useRef(null);
-  const ROW_HEIGHT = 22; // px – must match leading-[22px]
+  const isDraggingRef = useRef(false);
+  const rafRef = useRef(null);
+  const mouseYRef = useRef(0);
+  const mouseXRef = useRef(0);
+  const [rangeStartInput, setRangeStartInput] = useState('');
+  const [rangeEndInput, setRangeEndInput] = useState('');
+  const [rangeError, setRangeError] = useState('');
+  const ROW_HEIGHT = 22;
+  const OFFSET_COLUMN_WIDTH = 72;
+  const BYTE_CELL_WIDTH = 28;
+  const SCROLL_CONTAINER_PADDING_X = 16;
+  const AUTO_SCROLL_EDGE_ZONE = 80;
+  const AUTO_SCROLL_MAX_SPEED = 22;
+  const selectedByteStyle = {
+    background: 'linear-gradient(135deg, rgba(20, 184, 166, 0.74), rgba(16, 185, 129, 0.58))',
+    color: '#ECFEFF',
+    boxShadow: 'inset 0 0 0 1px rgba(103, 232, 249, 0.5), 0 0 9px rgba(16, 185, 129, 0.25)',
+    textShadow: '0 0 6px rgba(6, 182, 212, 0.45)',
+  };
+  const selectedAsciiStyle = {
+    background: 'linear-gradient(135deg, rgba(20, 184, 166, 0.34), rgba(16, 185, 129, 0.22))',
+    color: '#D1FAE5',
+    boxShadow: 'inset 0 -1px 0 rgba(45, 212, 191, 0.45), inset 0 1px 0 rgba(16, 185, 129, 0.22)',
+    textShadow: '0 0 5px rgba(45, 212, 191, 0.35)',
+  };
 
   // Normalized selection range
   const sStart = selectionStart !== null && selectionEnd !== null
@@ -28,12 +52,12 @@ export default function HexEditor({
   const sEnd = selectionStart !== null && selectionEnd !== null
     ? Math.max(selectionStart, selectionEnd) : -1;
 
-  // Total rows in the dump
   const totalRows = useMemo(() => Math.ceil(hexBytes.length / BYTES_PER_ROW), [hexBytes.length]);
 
-  // Current "sector" label derived from scroll position
   const [visibleSector, setVisibleSector] = useState(1);
   const totalSectors = useMemo(() => Math.max(1, Math.ceil(hexBytes.length / BYTES_PER_PAGE)), [hexBytes.length]);
+  const isMbrLevel = levelData?.difficulty === 'mbr';
+  const mbrUnlocked = unlockedOffset !== null;
 
   const updateSectorLabel = useCallback(() => {
     if (!scrollRef.current) return;
@@ -44,7 +68,6 @@ export default function HexEditor({
     setVisibleSector(Math.min(sector, totalSectors));
   }, [totalSectors]);
 
-  // Scroll to a specific byte offset
   const scrollToOffset = useCallback((offset) => {
     if (!scrollRef.current) return;
     const row = Math.floor(offset / BYTES_PER_ROW);
@@ -52,23 +75,46 @@ export default function HexEditor({
     scrollRef.current.scrollTo({ top: targetScroll, behavior: 'smooth' });
   }, []);
 
-  // External navigation trigger from terminal "go <offset>"
+  const parseOffsetInput = useCallback((value) => {
+    const trimmed = value.trim().toLowerCase();
+    if (!trimmed) return null;
+    const parsed = trimmed.startsWith('0x')
+      ? parseInt(trimmed, 16)
+      : parseInt(trimmed, 10);
+    if (Number.isNaN(parsed) || parsed < 0 || parsed >= hexBytes.length) return null;
+    return parsed;
+  }, [hexBytes.length]);
+
+  const applyRangeSelection = useCallback(() => {
+    const start = parseOffsetInput(rangeStartInput);
+    const end = parseOffsetInput(rangeEndInput);
+    if (start === null || end === null) {
+      setRangeError('Invalid offset');
+      return;
+    }
+    const s = Math.min(start, end);
+    const e = Math.max(start, end);
+    if (isMbrLevel && !mbrUnlocked && e >= 512) {
+      setRangeError('Locked sector');
+      return;
+    }
+    onBeginSelection(s);
+    onExtendSelection(e);
+    onEndSelection();
+    scrollToOffset(s);
+    setRangeError('');
+  }, [isMbrLevel, mbrUnlocked, onBeginSelection, onEndSelection, onExtendSelection, parseOffsetInput, rangeEndInput, rangeStartInput, scrollToOffset]);
+
   useEffect(() => {
     if (goToOffsetTrigger && goToOffsetTrigger.offset !== undefined) {
       scrollToOffset(goToOffsetTrigger.offset);
     }
   }, [goToOffsetTrigger, scrollToOffset]);
 
-  // Stashed decoy ranges (for visual feedback after stashing)
   const stashedDecoyRanges = useMemo(() => {
     return (stashedChunks || []).filter(c => c.verdict === 'decoy').map(c => ({ start: c.start, end: c.end }));
   }, [stashedChunks]);
 
-  // MBR obfuscation check
-  const isMbrLevel = levelData?.difficulty === 'mbr';
-  const mbrUnlocked = unlockedOffset !== null;
-
-  // Build ALL rows (no pagination — continuous scroll)
   const rows = useMemo(() => {
     const result = [];
     for (let r = 0; r < totalRows; r++) {
@@ -79,7 +125,6 @@ export default function HexEditor({
     return result;
   }, [hexBytes, totalRows]);
 
-  // Visible range for scroll position (first/last visible byte offsets)
   const [viewRange, setViewRange] = useState({ start: 0, end: 0 });
   const updateViewRange = useCallback(() => {
     if (!scrollRef.current) return;
@@ -97,11 +142,127 @@ export default function HexEditor({
     updateViewRange();
   }, [hexBytes.length, updateViewRange]);
 
+  // ── Auto-scroll during drag ──
+  // Compute the byte index at a given pointer coordinate within the scroll container.
+  // This keeps drag selection precise even while the container scrolls.
+  const getByteIndexAtPoint = useCallback((clientX, clientY) => {
+    if (!scrollRef.current) return null;
+    const rect = scrollRef.current.getBoundingClientRect();
+    const visibleY = Math.max(rect.top + 1, Math.min(clientY, rect.bottom - 1));
+    const relY = visibleY - rect.top + scrollRef.current.scrollTop;
+    const row = Math.floor(relY / ROW_HEIGHT);
+    const clampedRow = Math.max(0, Math.min(row, totalRows - 1));
+
+    const hexStartX = rect.left + SCROLL_CONTAINER_PADDING_X + OFFSET_COLUMN_WIDTH;
+    const relX = clientX - hexStartX;
+    const col = Math.floor(relX / BYTE_CELL_WIDTH);
+    const clampedCol = Math.max(0, Math.min(col, BYTES_PER_ROW - 1));
+
+    return Math.min(clampedRow * BYTES_PER_ROW + clampedCol, hexBytes.length - 1);
+  }, [totalRows, hexBytes.length]);
+
+  // The auto-scroll animation loop
+  const autoScrollLoop = useCallback(() => {
+    if (!isDraggingRef.current || !scrollRef.current) return;
+
+    const el = scrollRef.current;
+    const rect = el.getBoundingClientRect();
+    const y = mouseYRef.current;
+    const x = mouseXRef.current;
+
+    let scrollDelta = 0;
+
+    if (y < rect.top + AUTO_SCROLL_EDGE_ZONE) {
+      // Near top edge — scroll up
+      const proximity = Math.max(0, 1 - (y - rect.top) / AUTO_SCROLL_EDGE_ZONE); // 0..1
+      scrollDelta = -AUTO_SCROLL_MAX_SPEED * proximity;
+    } else if (y > rect.bottom - AUTO_SCROLL_EDGE_ZONE) {
+      // Near bottom edge — scroll down
+      const proximity = Math.max(0, 1 - (rect.bottom - y) / AUTO_SCROLL_EDGE_ZONE); // 0..1
+      scrollDelta = AUTO_SCROLL_MAX_SPEED * proximity;
+    }
+
+    if (scrollDelta !== 0) {
+      const maxScrollTop = el.scrollHeight - el.clientHeight;
+      el.scrollTop = Math.max(0, Math.min(maxScrollTop, el.scrollTop + scrollDelta));
+
+      // Keep the active endpoint on the visible edge while auto-scrolling,
+      // otherwise the range can grow to off-screen bytes without visual feedback.
+      const visibleEdgeY = scrollDelta > 0 ? rect.bottom - 2 : rect.top + 2;
+      const byteIdx = getByteIndexAtPoint(x, visibleEdgeY);
+      if (byteIdx !== null) {
+        onExtendSelection(byteIdx);
+      }
+
+      updateSectorLabel();
+      updateViewRange();
+    }
+
+    rafRef.current = requestAnimationFrame(autoScrollLoop);
+  }, [getByteIndexAtPoint, onExtendSelection, updateSectorLabel, updateViewRange]);
+
+  const trackPointer = useCallback((e) => {
+    mouseXRef.current = e.clientX;
+    mouseYRef.current = e.clientY;
+  }, []);
+
+  // Start drag
+  const handleByteMouseDown = useCallback((e, absIdx) => {
+    e.preventDefault();
+    trackPointer(e);
+    if (e.shiftKey && selectionStart !== null) {
+      onExtendSelection(absIdx);
+      onEndSelection();
+      return;
+    }
+    isDraggingRef.current = true;
+    onBeginSelection(absIdx);
+    if (!rafRef.current) {
+      rafRef.current = requestAnimationFrame(autoScrollLoop);
+    }
+  }, [selectionStart, onBeginSelection, onEndSelection, onExtendSelection, autoScrollLoop, trackPointer]);
+
+  // Track mouse position globally during drag
+  useEffect(() => {
+    const handleGlobalMouseMove = (e) => {
+      mouseXRef.current = e.clientX;
+      mouseYRef.current = e.clientY;
+      if (isDraggingRef.current) {
+        const el = scrollRef.current;
+        const rect = el?.getBoundingClientRect();
+        const targetY = rect
+          ? Math.max(rect.top + 1, Math.min(e.clientY, rect.bottom - 1))
+          : e.clientY;
+        const byteIdx = getByteIndexAtPoint(e.clientX, targetY);
+        if (byteIdx !== null) onExtendSelection(byteIdx);
+      }
+    };
+
+    const handleGlobalMouseUp = () => {
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        if (rafRef.current) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = null;
+        }
+        onEndSelection();
+      }
+    };
+
+    window.addEventListener('mousemove', handleGlobalMouseMove);
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [getByteIndexAtPoint, onEndSelection, onExtendSelection]);
+
   return (
     <div className="bg-gray-900/80 border border-gray-700/50 rounded-lg flex flex-col flex-1 min-h-0 overflow-hidden"
          style={{ boxShadow: '0 0 20px rgba(0,0,0,0.3)' }}>
       {/* Toolbar */}
-      <div className="flex justify-between items-center border-b border-gray-800 px-4 py-2.5 shrink-0 bg-gray-900">
+      <div className="flex justify-between items-center gap-3 border-b border-gray-800 px-4 py-2.5 shrink-0 bg-gray-900">
         <div className="flex items-center gap-3">
           <h2 className="text-xs font-bold text-gray-300 tracking-widest uppercase flex items-center gap-2">
             <span className={`w-2 h-2 rounded-full ${hexBytes.length > 0 ? 'bg-green-500 animate-pulse' : 'bg-gray-600'}`}
@@ -114,12 +275,57 @@ export default function HexEditor({
             </span>
           )}
           {sStart >= 0 && (
-            <span className="text-[10px] bg-blue-900/40 text-blue-300 px-2 py-0.5 rounded border border-blue-800/50 font-mono">
+            <span className="text-[10px] bg-emerald-950/50 text-cyan-200 px-2 py-0.5 rounded border border-cyan-700/50 font-mono shadow-[0_0_10px_rgba(20,184,166,0.16)]">
               SEL: {sEnd - sStart + 1}B @ 0x{formatOffset(sStart)}–0x{formatOffset(sEnd)}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
+          <div
+            className="flex items-center gap-1.5"
+            title="Range select by byte offset. Accepts decimal or 0x hex offsets."
+          >
+            <span className="text-[10px] text-gray-500 uppercase tracking-wider">Range</span>
+            <input
+              type="text"
+              value={rangeStartInput}
+              onChange={(e) => {
+                setRangeStartInput(e.target.value);
+                setRangeError('');
+              }}
+              placeholder="start"
+              className={`w-20 bg-gray-950/70 border rounded px-2 py-1 text-[10px] text-cyan-200 outline-none font-mono
+                ${rangeError ? 'border-red-600/60' : 'border-gray-700 focus:border-cyan-600/70'}`}
+              spellCheck={false}
+            />
+            <input
+              type="text"
+              value={rangeEndInput}
+              onChange={(e) => {
+                setRangeEndInput(e.target.value);
+                setRangeError('');
+              }}
+              placeholder="end"
+              className={`w-20 bg-gray-950/70 border rounded px-2 py-1 text-[10px] text-cyan-200 outline-none font-mono
+                ${rangeError ? 'border-red-600/60' : 'border-gray-700 focus:border-cyan-600/70'}`}
+              spellCheck={false}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applyRangeSelection();
+              }}
+            />
+            <button
+              type="button"
+              onClick={applyRangeSelection}
+              disabled={hexBytes.length === 0}
+              className="bg-gray-800/70 hover:bg-cyan-900/50 border border-gray-700 hover:border-cyan-600/60 text-cyan-300 font-bold py-1 px-2.5 rounded text-[10px] transition-all uppercase tracking-wider disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Select byte range by offset"
+            >
+              Select
+            </button>
+            {rangeError && (
+              <span className="text-[10px] text-red-400 font-mono">{rangeError}</span>
+            )}
+          </div>
           {sStart >= 0 && (
             <button
               onClick={onStash}
@@ -131,8 +337,8 @@ export default function HexEditor({
         </div>
       </div>
 
-      {/* Hex content — continuous scroll */}
-      <div className="flex-1 overflow-hidden flex flex-col min-h-0" onMouseUp={onEndSelection}>
+      {/* Hex content — continuous scroll with drag auto-scroll */}
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
         {hexBytes.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">
             <div className="text-center">
@@ -159,9 +365,15 @@ export default function HexEditor({
               ref={scrollRef}
               className="flex-1 overflow-y-auto px-4 font-mono text-[13px] select-none min-h-0"
               onScroll={() => { updateSectorLabel(); updateViewRange(); }}
+              onMouseMove={(e) => {
+                trackPointer(e);
+                if (isDraggingRef.current) {
+                  const byteIdx = getByteIndexAtPoint(e.clientX, e.clientY);
+                  if (byteIdx !== null) onExtendSelection(byteIdx);
+                }
+              }}
             >
               {rows.map(({ rowBytes, absOffset }) => {
-                // MBR obfuscation: hide sectors beyond 512 if not unlocked
                 const isObfuscated = isMbrLevel && !mbrUnlocked && absOffset >= 512;
 
                 if (isObfuscated) {
@@ -188,22 +400,25 @@ export default function HexEditor({
                         return (
                           <div
                             key={bIdx}
-                            onMouseDown={() => onBeginSelection(absIdx)}
-                            onMouseEnter={() => onExtendSelection(absIdx)}
+                            onMouseDown={(e) => handleByteMouseDown(e, absIdx)}
+                            onMouseEnter={(e) => {
+                              trackPointer(e);
+                              if (isDraggingRef.current) onExtendSelection(absIdx);
+                            }}
+                            onMouseMove={trackPointer}
                             className={`w-7 text-center cursor-crosshair transition-colors duration-0
                               ${isSelected
-                                ? 'bg-blue-500/80 text-white rounded-sm'
+                                ? 'text-emerald-50 rounded-sm'
                                 : isDecoy
                                   ? 'bg-red-900/30 text-red-400/70'
                                   : 'hover:bg-gray-700/40 text-green-300/80'
                               }`}
-                            style={isSelected ? { boxShadow: '0 0 4px rgba(59,130,246,0.5)' } : {}}
+                            style={isSelected ? selectedByteStyle : {}}
                           >
                             {byte}
                           </div>
                         );
                       })}
-                      {/* Pad if row is short */}
                       {rowBytes.length < BYTES_PER_ROW && Array.from({ length: BYTES_PER_ROW - rowBytes.length }).map((_, i) => (
                         <div key={`pad-${i}`} className="w-7" />
                       ))}
@@ -219,8 +434,9 @@ export default function HexEditor({
                           <span
                             key={`a-${bIdx}`}
                             className={`inline-block w-[10px] text-center transition-colors duration-0
-                              ${isSelected ? 'bg-blue-500/60 text-white rounded-sm'
+                              ${isSelected ? 'rounded-sm'
                                 : isDecoy ? 'text-red-400/50' : ''}`}
+                            style={isSelected ? selectedAsciiStyle : {}}
                           >
                             {getAsciiChar(byte)}
                           </span>
@@ -254,7 +470,7 @@ export default function HexEditor({
           <div className="flex items-center gap-2 text-[10px] text-gray-600">
             <span>{totalRows} rows</span>
             <span className="text-gray-700">|</span>
-            <span>Scroll to navigate • Drag to select</span>
+            <span>Drag, shift-click, or use Range Select</span>
           </div>
         </div>
       )}

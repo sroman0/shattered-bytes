@@ -1,3 +1,5 @@
+import { STORY } from '../data/campaign';
+
 export default function ScoreBoard({
   score,
   totalScore,
@@ -64,7 +66,8 @@ export default function ScoreBoard({
              style={{ boxShadow: '0 0 40px rgba(74,222,128,0.15)' }}>
           <div className="text-center">
             <h2 className="text-2xl font-bold text-green-400 tracking-wider mb-2">FINAL FORENSIC REPORT</h2>
-            <p className="text-gray-400 text-sm mb-6">The case is complete. The score reflects method, precision, and reporting discipline.</p>
+            <p className="text-gray-400 text-sm mb-2">The case is complete. The score reflects method, precision, and reporting discipline.</p>
+            <p className="text-xs text-cyan-400/80 mb-6 leading-relaxed">{STORY.finalReport}</p>
           </div>
 
           <div className="bg-gray-800/50 rounded-lg p-4 mb-5 border border-gray-700/50 text-center">
@@ -138,6 +141,13 @@ export default function ScoreBoard({
             </p>
           )}
         </div>
+
+        {currentLevel.debrief && (
+          <div className="bg-cyan-950/20 border border-cyan-900/40 rounded-lg px-3.5 py-3 mb-5">
+            <div className="text-[9px] text-cyan-500 uppercase tracking-[0.22em] mb-1 font-bold">Investigation Update</div>
+            <p className="text-xs text-gray-300 leading-relaxed">{currentLevel.debrief}</p>
+          </div>
+        )}
 
         <div className="grid grid-cols-3 gap-3 mb-5">
           <div className="bg-gray-800/50 rounded-lg p-3 text-center border border-gray-700/30">

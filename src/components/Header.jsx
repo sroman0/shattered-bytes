@@ -9,8 +9,8 @@ export default function Header({ totalScore, elapsedTime, phase, GAME_PHASE, obj
     return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
   };
 
-  const completedCount = objectives ? objectives.filter(o => o.completed).length : 0;
-  const totalObjectives = objectives ? objectives.length : 0;
+  //const completedCount = objectives ? objectives.filter(o => o.completed).length : 0;
+  //const totalObjectives = objectives ? objectives.length : 0;
 
   return (
     <>
@@ -29,7 +29,7 @@ export default function Header({ totalScore, elapsedTime, phase, GAME_PHASE, obj
 
         <div className="flex items-center gap-3">
           {/* Objectives progress */}
-          {phase === GAME_PHASE.PLAYING && totalObjectives > 0 && (
+          {/* {phase === GAME_PHASE.PLAYING && totalObjectives > 0 && (
             <div className="flex items-center gap-2 bg-gray-800/50 px-3 py-1.5 rounded border border-gray-700/50">
               <span className="text-[10px] text-gray-500 uppercase">Objectives</span>
               <span className="text-sm font-mono text-cyan-400 tabular-nums">{completedCount}/{totalObjectives}</span>
@@ -47,7 +47,7 @@ export default function Header({ totalScore, elapsedTime, phase, GAME_PHASE, obj
                 ))}
               </div>
             </div>
-          )}
+          )}*/}
 
           {phase === GAME_PHASE.PLAYING && (
             <div className="flex items-center gap-2 bg-gray-800/50 px-3 py-1.5 rounded border border-gray-700/50">

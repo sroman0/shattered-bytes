@@ -1,4 +1,4 @@
-import { CAMPAIGN } from '../data/campaign';
+import { CAMPAIGN, STORY } from '../data/campaign';
 
 export default function MainMenu({ onStart, onHowToPlay, completedLevels, totalScore }) {
   const hasProgress = completedLevels.length > 0;
@@ -39,9 +39,15 @@ export default function MainMenu({ onStart, onHowToPlay, completedLevels, totalS
         <p className="text-gray-400 text-sm mb-2 max-w-md mx-auto leading-relaxed">
           A Serious Game on <span className="text-green-400 font-semibold">Data Carving</span> & Digital Forensics
         </p>
-        <p className="text-gray-600 text-xs mb-8 max-w-md mx-auto">
-          Master hex analysis, file signature recognition, MBR parsing, and XOR decryption
-          through {CAMPAIGN.length} progressive forensic investigation cases.
+        <p className="text-cyan-500/70 text-[10px] uppercase tracking-[0.22em] mb-2">
+          {STORY.operation}
+        </p>
+        <p className="text-gray-500 text-xs mb-3 max-w-lg mx-auto leading-relaxed">
+          {STORY.premise}
+        </p>
+        <p className="text-gray-600 text-xs mb-8 max-w-lg mx-auto leading-relaxed">
+          Take the role of {STORY.playerRole} and master hex analysis, file signatures,
+          MBR parsing, and XOR decryption through {CAMPAIGN.length} linked evidence recoveries.
         </p>
 
         {/* Stats if returning */}

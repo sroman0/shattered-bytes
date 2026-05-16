@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { KNOWN_SIGNATURES } from '../data/campaign';
+import { KNOWN_SIGNATURES, STORY } from '../data/campaign';
 
 export default function Briefing({ level, onStart }) {
   const concept = level.forensicConcept;
@@ -48,6 +48,17 @@ export default function Briefing({ level, onStart }) {
           {/* Tab: Mission Brief */}
           {activeTab === 'mission' && (
             <>
+              <div className="bg-cyan-950/20 border border-cyan-900/40 rounded-lg px-3.5 py-3 mb-4">
+                <div className="text-[9px] text-cyan-500 uppercase tracking-[0.22em] mb-1 font-bold">
+                  {STORY.operation}
+                </div>
+                <p className="text-xs text-gray-300 leading-relaxed">{level.caseNote}</p>
+                <div className="mt-2 flex items-center justify-between gap-3 text-[10px] text-gray-500">
+                  <span>Handler: <span className="text-cyan-400">Agent Root</span></span>
+                  <span>Adversary: <span className="text-red-400">{STORY.antagonist}</span></span>
+                </div>
+              </div>
+
               <div className="space-y-2 mb-4">
                 {level.briefing.map((line, i) => (
                   <p key={i} className="text-[13px] text-gray-300 leading-relaxed">{line}</p>

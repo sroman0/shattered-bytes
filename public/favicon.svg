@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Background circle -->
+  <circle cx="16" cy="16" r="15" fill="#030712" stroke="#4ade80" stroke-width="1.5"/>
+  <!-- Hex grid lines -->
+  <line x1="8" y1="8" x2="8" y2="24" stroke="#4ade80" stroke-width="0.5" opacity="0.3"/>
+  <line x1="16" y1="8" x2="16" y2="24" stroke="#4ade80" stroke-width="0.5" opacity="0.3"/>
+  <line x1="24" y1="8" x2="24" y2="24" stroke="#4ade80" stroke-width="0.5" opacity="0.3"/>
+  <line x1="8" y1="12" x2="24" y2="12" stroke="#4ade80" stroke-width="0.5" opacity="0.3"/>
+  <line x1="8" y1="20" x2="24" y2="20" stroke="#4ade80" stroke-width="0.5" opacity="0.3"/>
+  <!-- Byte values -->
+  <text x="10" y="11" font-family="monospace" font-size="4" fill="#4ade80" opacity="0.7">89</text>
+  <text x="18" y="11" font-family="monospace" font-size="4" fill="#4ade80" opacity="0.7">50</text>
+  <text x="10" y="18" font-family="monospace" font-size="5.5" fill="#4ade80" font-weight="bold">SB</text>
+  <text x="18" y="18" font-family="monospace" font-size="4" fill="#22d3ee" opacity="0.8">4E</text>
+  <text x="10" y="24" font-family="monospace" font-size="4" fill="#4ade80" opacity="0.5">47</text>
+  <text x="18" y="24" font-family="monospace" font-size="4" fill="#4ade80" opacity="0.5">0D</text>
+  <!-- Magnifying glass overlay -->
+  <circle cx="21" cy="21" r="6" fill="none" stroke="#22d3ee" stroke-width="1.5" opacity="0.8"/>
+  <line x1="25.5" y1="25.5" x2="29" y2="29" stroke="#22d3ee" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
+  <!-- Scan highlight -->
+  <rect x="17" y="15" width="8" height="6" fill="#22d3ee" opacity="0.1" rx="1"/>
+</svg>

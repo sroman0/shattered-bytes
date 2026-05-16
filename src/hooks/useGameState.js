@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { CAMPAIGN } from '../data/campaign';
+import { CAMPAIGN, STORY } from '../data/campaign';
 import { parseHexDump } from '../utils/hexUtils';
 import { applyXor, parseXorKey } from '../utils/crypto';
 import { carveBlob } from '../utils/buffer';
@@ -203,6 +203,8 @@ export default function useGameState() {
     setLevelStartTime(Date.now());
     setElapsedTime(0);
     setLogs([
+      { type: 'system', text: STORY.operation },
+      { type: 'info', text: `Handler: Agent Root | Adversary: ${STORY.antagonist}` },
       { type: 'system', text: `MISSION: ${currentLevel.title}` },
       { type: 'info', text: currentLevel.subtitle },
       { type: 'system', text: 'Datastream loaded. Hex viewer online.' },
@@ -229,8 +231,8 @@ export default function useGameState() {
   }, []);
 
   const extendSelection = useCallback((absIdx) => {
-    if (isSelecting) setSelectionEnd(absIdx);
-  }, [isSelecting]);
+    setSelectionEnd(absIdx);
+  }, []);
 
   const endSelection = useCallback(() => {
     setIsSelecting(false);
@@ -522,6 +524,7 @@ export default function useGameState() {
         pushLog('--- AVAILABLE COMMANDS ---', 'system');
         pushLog('  help              — Show this message', 'info');
         pushLog('  go <offset>       — Jump to byte offset / unlock MBR sector', 'info');
+        pushLog('  select <a> <b>    — Select byte range by offsets, then stash', 'info');
         pushLog('  search <hex>      — Search for hex pattern (e.g. search 89504E47)', 'info');
         pushLog('  info              — Show current level metadata', 'info');
         pushLog('  hint              — Request an investigation hint (-15 pts)', 'info');
@@ -570,6 +573,51 @@ export default function useGameState() {
             pushLog(`Navigating to offset ${offset} (0x${offset.toString(16).toUpperCase()})`, 'info');
             addTimelineEvent('navigate', `Go to 0x${offset.toString(16).toUpperCase()}`);
           }
+        }
+        break;
+
+      case 'select':
+        if (args.length < 2) {
+          pushLog('Usage: select <start> <end> (decimal or 0x hex)', 'error');
+          break;
+        }
+        {
+          const parseOffset = (value) => {
+            const cleaned = value.trim().replace(/,$/, '');
+            const parsed = cleaned.startsWith('0x') ? parseInt(cleaned, 16) : parseInt(cleaned, 10);
+            if (Number.isNaN(parsed) || parsed < 0 || parsed >= hexBytes.length) return null;
+            return parsed;
+          };
+
+          const rangeTokens = args
+            .slice(1)
+            .join(' ')
+            .replace(/\s*[-–—]\s*/, ' ')
+            .split(/\s+/)
+            .filter(Boolean);
+          const startToken = rangeTokens[0];
+          const endToken = rangeTokens[1];
+
+          const start = parseOffset(startToken || '');
+          const end = parseOffset(endToken || '');
+          if (start === null || end === null) {
+            pushLog('select expects two offsets inside the current dump.', 'error');
+            break;
+          }
+
+          const s = Math.min(start, end);
+          const e = Math.max(start, end);
+          if (levelData?.difficulty === 'mbr' && unlockedOffset === null && e >= 512) {
+            pushLog('Selection blocked: target sectors are still locked. Use go <calculated_offset> first.', 'error');
+            break;
+          }
+
+          setSelectionStart(s);
+          setSelectionEnd(e);
+          setIsSelecting(false);
+          triggerGoTo(s);
+          pushLog(`Selected range 0x${s.toString(16).toUpperCase()} - 0x${e.toString(16).toUpperCase()} (${e - s + 1} bytes). Click + Stash Selection.`, 'success');
+          addTimelineEvent('select', `Selected 0x${s.toString(16).toUpperCase()}-0x${e.toString(16).toUpperCase()}`);
         }
         break;
 
@@ -674,7 +722,7 @@ export default function useGameState() {
       default:
         pushLog(`Unknown command: "${args[0]}". Type "help" for available commands.`, 'error');
     }
-  }, [pushLog, levelData, hexBytes, objectives, hintsUsed, badSelections, carveAttempts, elapsedTime, pendingCaseResult, closeCase, currentLevel, completeObjective, useHint, applyXorOp, triggerGoTo]);
+  }, [pushLog, levelData, hexBytes, objectives, hintsUsed, badSelections, carveAttempts, elapsedTime, pendingCaseResult, closeCase, currentLevel, completeObjective, useHint, applyXorOp, triggerGoTo, unlockedOffset, addTimelineEvent]);
 
   // --- Reset game ---
   const resetGame = useCallback(() => {
