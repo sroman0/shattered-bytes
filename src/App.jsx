@@ -17,15 +17,14 @@ import EvidenceJournal from './components/EvidenceJournal';
 import SignatureReference from './components/SignatureReference';
 import ForensicNotepad from './components/ForensicNotepad';
 import InvestigationTimeline from './components/InvestigationTimeline';
+import ObjectiveToast from './components/ObjectiveToast';
 
 export default function App() {
   const game = useGameState();
   const { GAME_PHASE, CAMPAIGN } = game;
   const [hasNotes, setHasNotes] = useState(false);
   const [showBoot, setShowBoot] = useState(true);
-  const [showIntro, setShowIntro] = useState(() => {
-    try { return localStorage.getItem('shattered_bytes_intro_seen') !== '1'; } catch { return true; }
-  });
+  const [showIntro, setShowIntro] = useState(true);
   const [showTutorial, setShowTutorial] = useState(false);
   const [tutorialSeen, setTutorialSeen] = useState(() => {
     try { return localStorage.getItem('shattered_bytes_tutorial_seen') === '1'; } catch { return false; }
@@ -69,17 +68,18 @@ export default function App() {
     // else: stay on menu
   }, [game]);
 
+  const handleIntroComplete = useCallback(() => {
+    setShowIntro(false);
+  }, []);
+
   // --- Boot Sequence ---
   if (showBoot) {
     return <BootSequence onComplete={handleBootComplete} />;
   }
 
-  // --- Intro Video (plays once after boot) ---
+  // --- Intro Video (plays once for the current page load after boot) ---
   if (showIntro) {
-    return <IntroVideo onComplete={() => {
-      setShowIntro(false);
-      try { localStorage.setItem('shattered_bytes_intro_seen', '1'); } catch { /* ignore */ }
-    }} />;
+    return <IntroVideo onComplete={handleIntroComplete} />;
   }
 
   // --- Tutorial overlay ---
@@ -110,6 +110,9 @@ export default function App() {
       {showBriefing && (
         <Briefing level={game.currentLevel} onStart={game.startPlaying} />
       )}
+
+      {/* Objective toast notifications */}
+      <ObjectiveToast objectives={game.objectives} />
 
       {/* Score / Victory / Campaign end overlays */}
       <ScoreBoard

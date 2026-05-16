@@ -12,6 +12,7 @@ export default function Terminal({ logs, onCommand }) {
     ['help', 'Print the command list in the terminal log.'],
     ['select <a> <b>', 'Select byte range by offsets, e.g. select 0x8CE 0xA22.'],
     ['search <hex>', 'Find byte-pattern offsets, e.g. search 89504E47.'],
+    ['entropy [size]', 'Scan byte blocks for entropy anomalies, default 64 bytes.'],
     ['info', 'Show metadata for the current evidence dump.'],
     ['status', 'Show objectives, hints, attempts, and time.'],
     ['hint', 'Request the next hint with score penalty.'],

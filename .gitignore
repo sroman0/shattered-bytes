@@ -1,8 +1,29 @@
-// Ignore the context file
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Local/context files
 GEMINI.md
 
-// Ignore the solution file
-WALKTHROUGH.md
+# Solution guides
+docs/WALKTHROUGH.md
 
-// Ignore the temporary files
+# Temporary/generated files
 tmp/
+
+__pycache__/
+*.pyc
+
+# LaTeX build auxiliaries
+*.aux
+*.log
+*.nav
+*.out
+*.snm
+*.toc
+*.vrb
+*.fls
+*.fdb_latexmk
+docs/presentation/out/

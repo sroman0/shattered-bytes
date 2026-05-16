@@ -11,13 +11,14 @@ Evidence images in assets/ represent realistic forensic scenarios:
 - evidence_document_tiny.png:     Forged identity document scan (used for decoys)
 """
 
-import json, os, random, uuid, struct
+import json, os, random, uuid
 
 random.seed(42)  # reproducible builds
 
 BASE = os.path.dirname(__file__)
-ASSETS = os.path.join(BASE, '..', 'assets')
-OUT = os.path.join(BASE, '..', 'public', 'levels')
+ROOT = os.path.abspath(os.path.join(BASE, '..', '..'))
+ASSETS = os.path.join(ROOT, 'assets')
+OUT = os.path.join(ROOT, 'public', 'levels')
 os.makedirs(OUT, exist_ok=True)
 
 # ── Load real forensic evidence from assets ─────────────────────────
@@ -58,6 +59,7 @@ def noise(n):
 
 
 def build_level(filename, data):
+    data['level_id'] = str(uuid.uuid5(uuid.NAMESPACE_URL, f'shattered-bytes/{filename}'))
     path = os.path.join(OUT, filename)
     with open(path, 'w') as f:
         json.dump(data, f, indent=2)
@@ -122,11 +124,15 @@ def level_2():
     mid1      = noise(1200)
     mid2      = noise(1600)
     post      = noise(500)
+    run1      = b'FR01' + len(frag1).to_bytes(2, 'big')
+    run2      = b'FR02' + len(frag2).to_bytes(2, 'big')
 
-    dump = pre + decoy + mid1 + frag1 + mid2 + frag2 + post
-    f1_start = len(pre) + len(decoy) + len(mid1)
+    dump = pre + decoy + mid1 + run1 + frag1 + mid2 + run2 + frag2 + post
+    r1_start = len(pre) + len(decoy) + len(mid1)
+    f1_start = r1_start + len(run1)
     f1_end   = f1_start + len(frag1) - 1
-    f2_start = f1_end + 1 + len(mid2)
+    r2_start = f1_end + 1 + len(mid2)
+    f2_start = r2_start + len(run2)
     f2_end   = f2_start + len(frag2) - 1
 
     d_start  = len(pre)
@@ -140,6 +146,26 @@ def level_2():
         "hex_dump": dump.hex().upper(),
         "metadata": {
             "chunks_required": 2,
+            "fragment_markers": [
+                {
+                    "label": "FR01",
+                    "hex": "46523031",
+                    "offset": r1_start,
+                    "length_bytes": len(frag1).to_bytes(2, 'big').hex().upper(),
+                    "payload_start": f1_start,
+                    "payload_end": f1_end,
+                    "meaning": "Recovered filesystem journal run descriptor for fragment 1"
+                },
+                {
+                    "label": "FR02",
+                    "hex": "46523032",
+                    "offset": r2_start,
+                    "length_bytes": len(frag2).to_bytes(2, 'big').hex().upper(),
+                    "payload_start": f2_start,
+                    "payload_end": f2_end,
+                    "meaning": "Recovered filesystem journal run descriptor for fragment 2"
+                }
+            ],
             "false_positives": [
                 {"start": d_start, "end": d_end,
                  "reason": "Orphan PNG header not connected to a recoverable file"}
@@ -266,18 +292,23 @@ def level_5():
     plaintext_recoverable = plaintext_full[:recoverable_size]
     ciphertext = bytes(b ^ xor_key for b in plaintext_recoverable)
 
-    pre   = noise(2200)
-    # Scatter some misleading text-like patterns
+    real_marker = b'NMPL'   # Night Meridian payload marker
+    decoy_marker = b'NXPL'  # Night Meridian decoy/candidate marker
+
+    pre   = noise(2196)
+    # Scatter a misleading XOR candidate with its own marker and a different key.
     decoy_text = bytes(b ^ 0x55 for b in b'NOT_THE_REAL_PAYLOAD_DATA')
-    mid1  = noise(800)
+    mid1  = noise(796)
     mid2  = noise(2200)
     post  = noise(600)
 
-    dump = pre + decoy_text + mid1 + ciphertext + mid2 + post
+    dump = pre + decoy_marker + decoy_text + mid1 + real_marker + ciphertext + mid2 + post
 
-    dt_start = len(pre)
+    dm_start = len(pre)
+    dt_start = dm_start + len(decoy_marker)
     dt_end   = dt_start + len(decoy_text) - 1
-    t_start  = dt_end + 1 + len(mid1)
+    rm_start = dt_end + 1 + len(mid1)
+    t_start  = rm_start + len(real_marker)
     t_end    = t_start + len(ciphertext) - 1
 
     return {
@@ -294,9 +325,28 @@ def level_5():
             "xor_encoded": True,
             "xor_key": xor_key,
             "known_plaintext_hint": "RANSOMWARE_PAYLOAD",
+            "payload_markers": [
+                {
+                    "label": "NMPL",
+                    "hex": real_marker.hex().upper(),
+                    "offset": rm_start,
+                    "payload_start": t_start,
+                    "payload_end": t_end,
+                    "meaning": "Night Meridian loader payload marker"
+                },
+                {
+                    "label": "NXPL",
+                    "hex": decoy_marker.hex().upper(),
+                    "offset": dm_start,
+                    "payload_start": dt_start,
+                    "payload_end": dt_end,
+                    "meaning": "Night Meridian decoy candidate marker"
+                }
+            ],
+            "entropy_block_size": 64,
             "false_positives": [
                 {"start": dt_start, "end": dt_end,
-                 "reason": "XOR-encoded noise with different key — not the target payload"}
+                 "reason": "NXPL-marked XOR candidate with different key — not the target payload"}
             ]
         },
         "solution_offsets": [{"start": t_start, "end": t_end}]
@@ -320,6 +370,9 @@ def level_6():
     frag2 = ciphertext[25:53]
     frag3 = ciphertext[53:]
 
+    def record(marker, payload):
+        return marker + bytes([len(payload)]) + payload
+
     pre    = noise(800)
     # Decoy: partial PNG header (anti-forensics bait)
     decoy1 = PNG_HEADER + b'CORRUPTED' + noise(15)
@@ -330,22 +383,30 @@ def level_6():
     decoy2 = bytes(b ^ 0x3C for b in b'FAKE_CREDENTIALS_NOT_REAL_DATA_')
     mid4   = noise(500)
     post   = noise(700)
+    rec1   = record(b'EX01', frag1)
+    rec2   = record(b'EX02', frag2)
+    rec3   = record(b'EX03', frag3)
+    decoy_record = record(b'EXD0', decoy2)
 
-    dump = pre + decoy1 + mid1 + frag1 + mid2 + frag2 + mid3 + decoy2 + mid4 + frag3 + post
+    dump = pre + decoy1 + mid1 + rec1 + mid2 + rec2 + mid3 + decoy_record + mid4 + rec3 + post
 
     d1_start = len(pre)
     d1_end   = d1_start + len(decoy1) - 1
 
-    f1_start = d1_end + 1 + len(mid1)
+    r1_start = d1_end + 1 + len(mid1)
+    f1_start = r1_start + 5
     f1_end   = f1_start + len(frag1) - 1
 
-    f2_start = f1_end + 1 + len(mid2)
+    r2_start = f1_end + 1 + len(mid2)
+    f2_start = r2_start + 5
     f2_end   = f2_start + len(frag2) - 1
 
-    d2_start = f2_end + 1 + len(mid3)
+    d2_record_start = f2_end + 1 + len(mid3)
+    d2_start = d2_record_start + 5
     d2_end   = d2_start + len(decoy2) - 1
 
-    f3_start = d2_end + 1 + len(mid4)
+    r3_start = d2_end + 1 + len(mid4)
+    f3_start = r3_start + 5
     f3_end   = f3_start + len(frag3) - 1
 
     return {
@@ -359,6 +420,44 @@ def level_6():
             "xor_encoded": True,
             "xor_key": xor_key,
             "known_plaintext_hint": "EXFILTRATED_CREDENTIALS",
+            "chunk_markers": [
+                {
+                    "label": "EX01",
+                    "hex": "45583031",
+                    "offset": r1_start,
+                    "length": len(frag1),
+                    "payload_start": f1_start,
+                    "payload_end": f1_end,
+                    "meaning": "Exfiltration staging record, fragment 1"
+                },
+                {
+                    "label": "EX02",
+                    "hex": "45583032",
+                    "offset": r2_start,
+                    "length": len(frag2),
+                    "payload_start": f2_start,
+                    "payload_end": f2_end,
+                    "meaning": "Exfiltration staging record, fragment 2"
+                },
+                {
+                    "label": "EX03",
+                    "hex": "45583033",
+                    "offset": r3_start,
+                    "length": len(frag3),
+                    "payload_start": f3_start,
+                    "payload_end": f3_end,
+                    "meaning": "Exfiltration staging record, fragment 3"
+                },
+                {
+                    "label": "EXD0",
+                    "hex": "45584430",
+                    "offset": d2_record_start,
+                    "length": len(decoy2),
+                    "payload_start": d2_start,
+                    "payload_end": d2_end,
+                    "meaning": "Decoy exfiltration record with wrong XOR key"
+                }
+            ],
             "false_positives": [
                 {"start": d1_start, "end": d1_end,
                  "reason": "Corrupted PNG header — anti-forensics bait, not the target payload"},

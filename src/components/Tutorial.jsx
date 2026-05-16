@@ -22,7 +22,7 @@ const TUTORIAL_STEPS = [
   {
     title: 'The Terminal',
     icon: '💻',
-    content: 'The terminal on the right provides forensic commands. Use "search <hex>" to find patterns, "go <offset>" to navigate, "select <start> <end>" for exact ranges, "info" for level metadata, and "hint" for guidance.',
+    content: 'The terminal on the right provides forensic commands. Use "search <hex>" to find patterns, "go <offset>" to navigate, "select <start> <end>" for exact ranges, "entropy" for anomaly triage, "info" for level metadata, and "hint" for guidance.',
     tip: 'Type "help" in the terminal to see all available commands.',
   },
   {

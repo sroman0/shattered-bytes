@@ -7,8 +7,11 @@ Lo script di esecuzione richiede:
 - `input_file`: Il percorso di un file valido (es. un'immagine PNG, JPG o un PDF) che farà da "prova da recuperare".
 - `output_file`: Il percorso dove salvare il file `livello.json` generato.
 - (Opzionale) `difficulty`: 
-  - `easy`: Il file viene inserito in un blocco unico in mezzo alla spazzatura.
-  - `hard`: Il file viene spezzato in 2 chunk e posizionato in punti casuali e distanti.
+  - `triage`: file contiguo con falso positivo.
+  - `fragmented`: file spezzato in due chunk.
+  - `partial`: recupero parziale con XOR.
+  - `mbr`: scenario con offset derivato da tabella MBR.
+  - `ransomware`: payload XOR-encoded.
 - (Opzionale) `noise_size`: Quantità di byte spazzatura da generare attorno al file. Default: 1024 bytes (1KB).
 
 ## Output
@@ -28,11 +31,17 @@ Il file `livello.json` conterrà:
 *I `solution_offsets` servono solo per il sistema di validazione automatica (o hints).*
 
 ## Strumenti
-Usa lo script `execution/generate_level.py`.
+Usa lo script legacy parametrico `scripts/level_generation/generate_level.py`.
+
+Per rigenerare i 6 livelli ufficiali della campagna usa invece:
+
+```bash
+npm run levels:build
+```
 
 ### Esempio di utilizzo:
 ```bash
-python3 execution/generate_level.py --input assets/sample.png --output public/levels/level_1.json --difficulty easy --noise 1024
+python3 scripts/level_generation/generate_level.py --input assets/evidence_chat_tiny.png --output public/levels/level_custom.json --difficulty triage --noise 1024
 ```
 
 ## Casi Limite & Error Handling

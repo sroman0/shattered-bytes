@@ -54,6 +54,12 @@ export const CAMPAIGN = [
     acceptedReport: 'recovered',
     requires_mbr: false,
     requires_xor: false,
+    nudges: [
+      { objectiveId: 'find_header', delaySeconds: 45, message: 'Try typing search 89504E47 in the terminal to locate PNG file signatures in the dump.' },
+      { objectiveId: 'select_range', delaySeconds: 90, message: 'Click and drag across hex bytes to select a range, or use select <start> <end> in the terminal. Remember: a valid PNG needs both header (89504E47) AND footer (49454E44AE426082).' },
+      { objectiveId: 'carve_file', delaySeconds: 120, message: 'After stashing your selection, click "Compose & Carve" in the Workbench panel on the left.' },
+      { objectiveId: 'report_recovered', delaySeconds: 150, message: 'Your evidence is carved! Now type report recovered in the terminal to submit your forensic conclusion.' },
+    ],
   },
 
   // ─── ACT 2 ─── Fragmented PNG reconstruction ──────────────────
@@ -66,6 +72,7 @@ export const CAMPAIGN = [
     briefing: [
       'The suspect\'s SSD used TRIM, causing file data to be scattered across non-contiguous disk sectors.',
       'A scanned image of a forged identity document — used by Night Meridian to open fraudulent bank accounts — was split into two fragments during deletion. The first fragment contains the PNG header, the second contains the footer.',
+      'Two filesystem journal remnants survived before the fragments: FR01 and FR02. Each marker is followed by a two-byte fragment length, then the fragment bytes.',
       'Garbage bytes between fragments are unrelated disk residue and must NOT be included in the reconstruction.',
       'Stash both fragments in the Workbench, keep their forensic order, carve the composed stream, then report recovered.',
     ],
@@ -76,9 +83,10 @@ export const CAMPAIGN = [
       paragraphs: [
         'When a file is saved, the operating system allocates disk clusters. If contiguous clusters are unavailable, the file is split across non-adjacent locations — this is fragmentation.',
         'After deletion, each fragment may survive independently. A forensic examiner must locate all fragments, determine their correct order, and reconstruct the original file.',
+        'Filesystem journals or allocation remnants can sometimes reveal fragment run descriptors. In this case, FR01 and FR02 identify two recovered runs and the length bytes immediately after each marker tell you where the fragment ends.',
         'The cluster gap between fragments often contains unrelated data (garbage). Including these bytes in the reconstruction corrupts the recovered file.',
       ],
-      keySignatures: ['PNG'],
+      keySignatures: ['PNG', 'FR01', 'FR02'],
     },
     objectives: [
       { id: 'find_chunk1', text: 'Find and stash Fragment #1 (contains the PNG header)', completed: false },
@@ -88,9 +96,10 @@ export const CAMPAIGN = [
       { id: 'report_recovered', text: 'Report the evidence as fully recovered', completed: false },
     ],
     hints: [
-      'Look for the PNG header (89 50 4E 47) for the first fragment.',
-      'The second fragment ends with the PNG footer: 49 45 4E 44 AE 42 60 82.',
-      'Do not include the unallocated garbage between fragments.',
+      'Look for the recovered run descriptors: FR01 = 46 52 30 31 and FR02 = 46 52 30 32.',
+      'Each FR marker is followed by a two-byte length field, then the fragment bytes. 00 AA means 170 bytes; 00 AB means 171 bytes.',
+      'The PNG header confirms fragment 1, and the IEND footer confirms fragment 2.',
+      'Do not include the FR marker, length bytes, or unallocated garbage in the stashed fragments.',
       'You can reorder fragments in the Workbench by dragging them.',
     ],
     maxScore: 200,
@@ -98,6 +107,11 @@ export const CAMPAIGN = [
     acceptedReport: 'recovered',
     requires_mbr: false,
     requires_xor: false,
+    nudges: [
+      { objectiveId: 'find_chunk1', delaySeconds: 45, message: 'Use search 46523031 to find FR01. The two bytes after it encode fragment length; stash only the fragment bytes after the descriptor.' },
+      { objectiveId: 'find_chunk2', delaySeconds: 90, message: 'Use search 46523032 to find FR02. It marks the second run; the PNG footer confirms the end of the recovered file.' },
+      { objectiveId: 'carve_file', delaySeconds: 140, message: 'Both fragments should now be in your Workbench. Make sure Fragment #1 (with the header) is first, then click "Compose & Carve".' },
+    ],
   },
 
   // ─── ACT 3 ─── Multi-signature triage (JPEG target, PDF decoy) ─
@@ -141,6 +155,11 @@ export const CAMPAIGN = [
     acceptedReport: 'recovered',
     requires_mbr: false,
     requires_xor: false,
+    nudges: [
+      { objectiveId: 'identify_target', delaySeconds: 45, message: 'Read the briefing carefully — the target is a JPEG (starts with FF D8 FF), not the PDF. Try search FFD8FF in the terminal.' },
+      { objectiveId: 'select_range', delaySeconds: 100, message: 'A valid JPEG runs from FF D8 FF to FF D9. Make sure BOTH the header and footer are present in your selection. Truncated headers are decoys.' },
+      { objectiveId: 'report_recovered', delaySeconds: 150, message: 'Evidence carved! Type report recovered in the terminal to close this case.' },
+    ],
   },
 
   // ─── ACT 4 ─── MBR Partition Archaeology ──────────────────────
@@ -189,6 +208,24 @@ export const CAMPAIGN = [
     acceptedReport: 'recovered',
     requires_mbr: true,
     requires_xor: false,
+    walkthroughExample: {
+      title: 'Worked Example: Reading an MBR Partition Entry',
+      steps: [
+        'The partition table starts at offset 0x1BE (446 bytes from the beginning).',
+        'Each partition entry is 16 bytes. The LBA start address is at bytes 8–11 of each entry.',
+        'Example: if bytes 8–11 read  3F 00 00 00  in the dump…',
+        'Little-Endian means least-significant byte first. Read right-to-left: 00 00 00 3F → 0x3F = 63.',
+        'Byte offset = LBA_start × sector_size. With sector_size = 32: 63 × 32 = 2016.',
+        'Type  go 2016  in the terminal to jump to that partition\'s data area.',
+      ],
+    },
+    nudges: [
+      { objectiveId: 'read_mbr', delaySeconds: 30, message: 'Navigate to offset 0x1BE (decimal 446) to inspect the MBR partition table. Use go 446 in the terminal; this does not unlock the partition yet.' },
+      { objectiveId: 'find_lba', delaySeconds: 60, message: 'Look at bytes 8–11 of the first partition entry. These 4 bytes contain the LBA start address in Little-Endian format (least-significant byte first).' },
+      { objectiveId: 'calculate_offset', delaySeconds: 90, message: 'To convert Little-Endian: read the 4 bytes right-to-left to get the hex value, convert to decimal, then multiply by the sector size (32 bytes).' },
+      { objectiveId: 'unlock_sector', delaySeconds: 120, message: 'Use the terminal command go <byte_offset> with the value you calculated to unlock the partition data.' },
+      { objectiveId: 'select_range', delaySeconds: 160, message: 'Now look for the PNG signature (89504E47) in the unlocked area. Select from header to footer and stash it.' },
+    ],
   },
 
   // ─── ACT 5 ─── XOR deobfuscation & partial recovery ──────────
@@ -200,23 +237,26 @@ export const CAMPAIGN = [
     caseNote: 'Malware triage finds a deleted configuration block from the Night Meridian loader. It may expose the payload family, but the tail has been overwritten.',
     briefing: [
       'A text artefact from the ransomware loader was partially overwritten after deletion. The surviving bytes were also weakly obfuscated with a single-byte XOR.',
-      'Malware triage suggests the plaintext likely starts with "RANSOMWARE_PAYLOAD".',
+      'Malware triage notes that Night Meridian loaders tag candidate payload blocks with small cleartext markers: NMPL for the real loader payload and NXPL for a planted decoy candidate.',
+      'The plaintext likely starts with "RANSOMWARE_PAYLOAD". Find the marked candidates, test the first encrypted byte against ASCII "R" (0x52), and reject the block whose derived key does not decode coherently.',
       'A perfect recovery is impossible: recover the surviving range, derive the XOR key from known plaintext, carve the readable fragment, then submit: report partial.',
-      'Warning: a decoy XOR-encoded block exists in the dump. Verify your selection against the known plaintext before committing.',
+      'If you want a secondary triage path, use entropy to locate blocks whose byte distribution deviates from the surrounding random noise.',
     ],
     debrief:
       'The partial payload is enough to identify the ransomware branch, but not enough to overclaim. The final dump may still contain the credentials used for exfiltration.',
     forensicConcept: {
-      title: 'XOR Obfuscation & Known-Plaintext Attacks',
+      title: 'Loader Markers, XOR & Known-Plaintext Attacks',
       paragraphs: [
         'XOR (exclusive OR) is the simplest form of obfuscation. Each byte of plaintext is combined with a key byte: ciphertext = plaintext ⊕ key. The same operation reverses it: plaintext = ciphertext ⊕ key.',
+        'Real malware often stores compact cleartext markers before encoded payloads so its loader can find the right block at runtime. Here, NMPL marks the Night Meridian payload candidate and NXPL marks a decoy candidate.',
         'If you know even one byte of the original plaintext, you can derive the key: key = ciphertext_byte ⊕ known_plaintext_byte. This is called a known-plaintext attack.',
+        'Entropy analysis is a secondary triage method: encoded text can have a different byte distribution from random filler, so anomalous blocks deserve closer inspection.',
         'Partial recovery occurs when part of the original data has been overwritten by new data. The forensic conclusion must accurately reflect that the recovery is incomplete — overclaiming undermines the entire investigation.',
       ],
-      keySignatures: [],
+      keySignatures: ['NMPL', 'NXPL'],
     },
     objectives: [
-      { id: 'find_partial', text: 'Identify the recoverable obfuscated text fragment', completed: false },
+      { id: 'find_partial', text: 'Identify the recoverable NMPL-marked obfuscated fragment', completed: false },
       { id: 'find_key', text: 'Derive the XOR key from known plaintext', completed: false },
       { id: 'decrypt', text: 'Apply XOR deobfuscation to the recovered fragment', completed: false },
       { id: 'carve_file', text: 'Carve the partial readable payload', completed: false },
@@ -224,9 +264,10 @@ export const CAMPAIGN = [
       { id: 'report_partial', text: 'Report a partial recovery without overclaiming', completed: false },
     ],
     hints: [
-      'The fragment is intentionally not readable before XOR deobfuscation.',
-      'For single-byte XOR, plaintext_byte XOR ciphertext_byte reveals the key.',
-      'Use xorcalc to XOR the first ciphertext byte with ASCII "R" (0x52).',
+      'Search for loader markers: NM is 4E4D and NX is 4E58. The encrypted candidate starts 4 bytes after the marker.',
+      'You can also use entropy to identify blocks whose byte distribution differs from the surrounding random filler.',
+      'For single-byte XOR, plaintext_byte XOR ciphertext_byte reveals the key. Test each candidate with ASCII "R" (0x52).',
+      'The NMPL candidate should derive key 0x2A and decode into RANSOMWARE_PAYLOAD...',
       'A missing tail means the correct conclusion is partial, not recovered.',
       'The report matters here as much as the byte selection.',
     ],
@@ -236,6 +277,11 @@ export const CAMPAIGN = [
     allowPartial: true,
     requires_mbr: false,
     requires_xor: true,
+    nudges: [
+      { objectiveId: 'find_partial', delaySeconds: 45, message: 'Search for marker 4E4D (NM) and 4E58 (NX). Each marked candidate starts 4 bytes after the marker; NMPL is the likely loader payload, NXPL is suspicious.' },
+      { objectiveId: 'find_key', delaySeconds: 90, message: 'Use xorcalc in the terminal: XOR the first encrypted byte after each marker with 0x52 (ASCII "R") to derive and compare candidate keys.' },
+      { objectiveId: 'report_partial', delaySeconds: 150, message: 'The file was partially overwritten — the correct conclusion is report partial, not recovered. Forensic integrity matters!' },
+    ],
   },
 
   // ─── ACT 6 ─── Ransomware Aftermath (multi-frag XOR triage) ───
@@ -248,7 +294,8 @@ export const CAMPAIGN = [
     briefing: [
       'The Night Meridian incident left encrypted credential fragments scattered across this dump. The attacker used single-byte XOR with an unknown key.',
       'Intelligence suggests the plaintext begins with "EXFILTRATED_CREDENTIALS". Use this to derive the XOR key.',
-      'Three separate fragments must be recovered and assembled in order. Decoy artefacts include a corrupted PNG header and a fake credential block encoded with a different XOR key.',
+      'Three separate fragments must be recovered and assembled in order. The staging tool left cleartext records EX01, EX02, and EX03; each record is followed by one length byte and then an XOR-encoded fragment.',
+      'Decoy artefacts include a corrupted PNG header and an EXD0 record containing fake credentials encoded with a different XOR key.',
       'After XOR decryption, carve the reassembled payload and report recovered.',
     ],
     debrief:
@@ -257,10 +304,11 @@ export const CAMPAIGN = [
       title: 'Incident Response & Multi-Artefact Triage',
       paragraphs: [
         'In a real ransomware investigation, exfiltrated data is often fragmented across multiple locations. The attacker may use weak encryption to hinder casual recovery while keeping the data accessible to their own tools.',
+        'Staging tools often need small cleartext record tags so they can reassemble chunks later. Here, EX01, EX02, and EX03 identify ordered exfiltration records; EXD0 is a planted decoy record.',
         'Forensic triage requires distinguishing between genuine evidence fragments, anti-forensics decoys, and unrelated data. Each stashed fragment affects your evidence chain — false inclusions weaken the case.',
         'When multiple fragments exist, their reconstruction order matters. An incorrect sequence produces corrupted output even if the individual fragments are correct.',
       ],
-      keySignatures: [],
+      keySignatures: ['EX01', 'EX02', 'EX03', 'EXD0'],
     },
     objectives: [
       { id: 'find_chunk1', text: 'Find and stash Fragment #1 (beginning of the payload)', completed: false },
@@ -273,11 +321,11 @@ export const CAMPAIGN = [
       { id: 'report_recovered', text: 'Report a full recovery of the credential payload', completed: false },
     ],
     hints: [
-      'Use search to find patterns. The plaintext starts with "EXFILTRATED_CREDENTIALS".',
-      'ASCII "E" = 0x45. XOR the first byte of a suspect fragment with 0x45 to test the key.',
-      'There are exactly 3 fragments. Check the Evidence Journal to avoid false inclusions.',
-      'A decoy credential block uses a different XOR key (0x3C) — it will produce garbage with the real key.',
-      'Fragment order: the first fragment begins with the "E" of EXFILTRATED.',
+      'Search for staging records: EX01 = 45 58 30 31, EX02 = 45 58 30 32, EX03 = 45 58 30 33.',
+      'The byte immediately after each EX record is the fragment length. Stash the encrypted bytes after that length byte.',
+      'ASCII "E" = 0x45. XOR the first byte after EX01 with 0x45 to derive the key.',
+      'EXD0 is a decoy credential block using a different XOR key (0x3C) — it will produce garbage with the real key.',
+      'Fragment order follows the record IDs: EX01, EX02, EX03.',
       'After stashing all 3 fragments in order, apply XOR in the Workbench, then Compose & Carve.',
     ],
     maxScore: 350,
@@ -285,6 +333,11 @@ export const CAMPAIGN = [
     acceptedReport: 'recovered',
     requires_mbr: false,
     requires_xor: true,
+    nudges: [
+      { objectiveId: 'find_chunk1', delaySeconds: 45, message: 'Search 45583031 to find EX01. The following byte is the fragment length; stash only the encrypted payload bytes after it.' },
+      { objectiveId: 'find_key', delaySeconds: 90, message: 'XOR the first EX01 payload byte with 0x45 (ASCII "E") using xorcalc to derive the real key. EXD0 is a wrong-key decoy.' },
+      { objectiveId: 'find_chunk3', delaySeconds: 140, message: 'Find EX02 and EX03 the same way. Stash fragments in record order: EX01, EX02, EX03.' },
+    ],
   },
 ];
 
@@ -298,4 +351,12 @@ export const KNOWN_SIGNATURES = {
   docx: { header: '504B0304', footer: '504B0506',         name: 'DOCX (Office)', description: 'Microsoft Office Open XML — same ZIP container' },
   exe:  { header: '4D5A',     footer: '',                 name: 'PE Executable', description: 'Windows Portable Executable binary' },
   elf:  { header: '7F454C46', footer: '',                 name: 'ELF Binary',    description: 'Linux Executable and Linkable Format' },
+  nmpl: { header: '4E4D504C', footer: '',                 name: 'NMPL Marker',   description: 'Night Meridian loader payload marker' },
+  nxpl: { header: '4E58504C', footer: '',                 name: 'NXPL Marker',   description: 'Night Meridian decoy candidate marker' },
+  fr01: { header: '46523031', footer: '',                 name: 'FR01 Run',      description: 'Recovered fragment run descriptor #1' },
+  fr02: { header: '46523032', footer: '',                 name: 'FR02 Run',      description: 'Recovered fragment run descriptor #2' },
+  ex01: { header: '45583031', footer: '',                 name: 'EX01 Record',   description: 'Exfiltration staging record #1' },
+  ex02: { header: '45583032', footer: '',                 name: 'EX02 Record',   description: 'Exfiltration staging record #2' },
+  ex03: { header: '45583033', footer: '',                 name: 'EX03 Record',   description: 'Exfiltration staging record #3' },
+  exd0: { header: '45584430', footer: '',                 name: 'EXD0 Decoy',    description: 'Wrong-key exfiltration decoy record' },
 };

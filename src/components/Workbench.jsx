@@ -76,13 +76,13 @@ export default function Workbench({ chunks, onRemove, onMove, onCarve, onXor, le
         {isXorLevel && (
           <div className="border border-purple-800/40 rounded-md p-2.5 bg-purple-950/20">
             <div className="text-[10px] text-purple-400 uppercase tracking-wider mb-2 font-bold">XOR Decryption</div>
-            <div className="flex gap-2">
+            <div className="grid grid-cols-[minmax(0,1fr)_76px] gap-2 items-center">
               <input
                 type="text"
                 value={xorInput}
                 onChange={(e) => setXorInput(e.target.value)}
                 placeholder="Key (e.g. 0x1A or 26)"
-                className="bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-xs text-purple-300 flex-1 outline-none focus:border-purple-500 transition-colors font-mono"
+                className="min-w-0 w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-xs text-purple-300 outline-none focus:border-purple-500 transition-colors font-mono"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && xorInput.trim()) {
                     onXor(xorInput);
@@ -93,7 +93,7 @@ export default function Workbench({ chunks, onRemove, onMove, onCarve, onXor, le
               <button
                 onClick={() => { onXor(xorInput); setXorInput(''); }}
                 disabled={chunks.length === 0 || !xorInput.trim()}
-                className="bg-purple-800/50 hover:bg-purple-700/60 border border-purple-600/50 text-purple-300 px-3 py-1.5 rounded text-xs transition-all disabled:opacity-30 disabled:cursor-not-allowed font-bold"
+                className="w-full bg-purple-800/50 hover:bg-purple-700/60 border border-purple-600/50 text-purple-300 px-2 py-1.5 rounded text-xs transition-all disabled:opacity-30 disabled:cursor-not-allowed font-bold whitespace-nowrap"
               >
                 DECRYPT
               </button>

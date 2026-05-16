@@ -248,6 +248,7 @@ export default function useGameState() {
     const newChunk = {
       id: Date.now(),
       hex: chunkHex,
+      sourceHex: chunkHex,
       start: sStart,
       end: sEnd,
       size: sEnd - sStart + 1,
@@ -336,14 +337,18 @@ export default function useGameState() {
 
     // Apply XOR to all chunks in workbench
     setStashedChunks(prev => prev.map(chunk => {
-      const decrypted = applyXor(chunk.hex, key);
-      return { ...chunk, hex: decrypted, opApplied: `XOR 0x${key.toString(16).toUpperCase().padStart(2, '0')}` };
+      const sourceHex = chunk.sourceHex || chunk.hex;
+      const decrypted = applyXor(sourceHex, key);
+      return {
+        ...chunk,
+        sourceHex,
+        hex: decrypted,
+        opApplied: `XOR 0x${key.toString(16).toUpperCase().padStart(2, '0')}`,
+      };
     }));
-    pushLog(`XOR decryption applied to ${stashedChunks.length} chunk(s): key=0x${key.toString(16).toUpperCase().padStart(2, '0')}`, 'success');
+    pushLog(`XOR transform applied to ${stashedChunks.length} chunk(s): key=0x${key.toString(16).toUpperCase().padStart(2, '0')}`, 'info');
     addTimelineEvent('xor', `XOR decrypt key=0x${key.toString(16).toUpperCase().padStart(2, '0')}`);
-    completeObjective('find_key');
-    completeObjective('decrypt');
-  }, [stashedChunks, pushLog, completeObjective]);
+  }, [stashedChunks, pushLog, addTimelineEvent]);
 
   const rangesMatchSolutions = useCallback(() => {
     const solutions = levelData?.solution_offsets || [];
@@ -459,6 +464,22 @@ export default function useGameState() {
     const combinedHex = stashedChunks.map(c => c.hex).join('');
     const ext = levelData?.target_extension || 'bin';
     const result = carveBlob(combinedHex, ext);
+    const expectedTextPrefix = levelData?.metadata?.expected_text_prefix
+      || levelData?.metadata?.known_plaintext_hint;
+
+    if (ext === 'txt' && expectedTextPrefix && !result.text?.startsWith(expectedTextPrefix)) {
+      setBadSelections(prev => prev + 1);
+      setCarvedText(null);
+      setCarvedUrl(null);
+      setPendingCaseResult(null);
+      pushLog(`Carve rejected: decoded text does not match expected plaintext prefix "${expectedTextPrefix}". Check the XOR key and retry.`, 'error');
+      return;
+    }
+
+    if (currentLevel.requires_xor) {
+      completeObjective('find_key');
+      completeObjective('decrypt');
+    }
 
     if (result.text) {
       setCarvedText(result.text);
@@ -526,6 +547,7 @@ export default function useGameState() {
         pushLog('  go <offset>       — Jump to byte offset / unlock MBR sector', 'info');
         pushLog('  select <a> <b>    — Select byte range by offsets, then stash', 'info');
         pushLog('  search <hex>      — Search for hex pattern (e.g. search 89504E47)', 'info');
+        pushLog('  entropy [size]    — Scan byte blocks for entropy anomalies', 'info');
         pushLog('  info              — Show current level metadata', 'info');
         pushLog('  hint              — Request an investigation hint (-15 pts)', 'info');
         pushLog('  xor <key>         — Apply XOR to workbench chunk (e.g. xor 0x1A)', 'info');
@@ -555,6 +577,15 @@ export default function useGameState() {
           }
 
           if (levelData?.difficulty === 'mbr') {
+            if (offset === levelData.metadata.partition_table_offset) {
+              triggerGoTo(offset);
+              pushLog(`Navigating to MBR partition table at offset ${offset} (0x${offset.toString(16).toUpperCase()}).`, 'success');
+              pushLog('Read bytes 8-11 of the first 16-byte entry, convert the Little-Endian LBA, then multiply by the sector size to unlock.', 'info');
+              addTimelineEvent('navigate', `MBR table at 0x${offset.toString(16).toUpperCase()}`);
+              completeObjective('read_mbr');
+              break;
+            }
+
             if (offset === levelData.metadata.target_offset_encoded) {
               setUnlockedOffset(offset);
               triggerGoTo(offset);
@@ -621,6 +652,68 @@ export default function useGameState() {
         }
         break;
 
+      case 'entropy':
+        {
+          const requestedSize = args[1] ? parseInt(args[1], 10) : (levelData?.metadata?.entropy_block_size || 64);
+          const blockSize = Number.isNaN(requestedSize)
+            ? 64
+            : Math.max(16, Math.min(256, requestedSize));
+          const bytes = hexBytes.map(b => parseInt(b, 16));
+          const blocks = [];
+
+          for (let offset = 0; offset < bytes.length; offset += blockSize) {
+            const slice = bytes.slice(offset, offset + blockSize);
+            if (slice.length < blockSize) continue;
+
+            const counts = new Map();
+            slice.forEach(byte => counts.set(byte, (counts.get(byte) || 0) + 1));
+
+            let entropy = 0;
+            counts.forEach(count => {
+              const p = count / slice.length;
+              entropy -= p * Math.log2(p);
+            });
+
+            blocks.push({
+              offset,
+              end: offset + slice.length - 1,
+              len: slice.length,
+              unique: counts.size,
+              entropy,
+            });
+          }
+
+          if (blocks.length === 0) {
+            pushLog('Entropy scan unavailable: current dump is empty.', 'error');
+            break;
+          }
+
+          const avgEntropy = blocks.reduce((sum, b) => sum + b.entropy, 0) / blocks.length;
+          const candidates = blocks
+            .map(block => ({ ...block, delta: Math.abs(block.entropy - avgEntropy) }))
+            .sort((a, b) => b.delta - a.delta)
+            .slice(0, 6);
+
+          pushLog(`Entropy scan: ${blockSize}B blocks | average H=${avgEntropy.toFixed(2)} bits/byte`, 'system');
+          pushLog('Largest deviations from baseline. Low H / fewer unique bytes can indicate structured encoded payloads.', 'info');
+          candidates.forEach((block, idx) => {
+            const type = idx < 2 ? 'success' : 'info';
+            pushLog(
+              `  0x${block.offset.toString(16).toUpperCase()}-0x${block.end.toString(16).toUpperCase()} | H=${block.entropy.toFixed(2)} | unique=${block.unique}/${block.len} | delta=${block.delta.toFixed(2)}`,
+              type
+            );
+          });
+
+          if (levelData?.metadata?.payload_markers?.length) {
+            const markers = levelData.metadata.payload_markers
+              .map(m => `${m.label}=0x${m.offset.toString(16).toUpperCase()}`)
+              .join(' | ');
+            pushLog(`Marker intel available: ${markers}. Cross-check with search 4E4D / search 4E58.`, 'warning');
+          }
+          addTimelineEvent('entropy', `Entropy scan ${blockSize}B`);
+        }
+        break;
+
       case 'search':
         if (args.length < 2) {
           pushLog('Usage: search <hex_pattern>', 'error');
@@ -656,6 +749,15 @@ export default function useGameState() {
           if (levelData.metadata?.mbr_present) pushLog('MBR detected at offset 0. Partition table at 0x1BE.', 'info');
           if (levelData.metadata?.xor_encoded) {
             pushLog('XOR obfuscation detected. Key is not provided; use known plaintext and xorcalc.', 'warning');
+          }
+          if (levelData.metadata?.payload_markers?.length) {
+            pushLog('Loader markers detected in case notes. Try search 4E4D (NM) and search 4E58 (NX) to enumerate XOR candidates.', 'warning');
+          }
+          if (levelData.metadata?.fragment_markers?.length) {
+            pushLog('Fragment run descriptors detected. Try search 46523031 (FR01) and search 46523032 (FR02); each descriptor is followed by a two-byte length.', 'warning');
+          }
+          if (levelData.metadata?.chunk_markers?.length) {
+            pushLog('Exfiltration records detected. Try search 45583031, 45583032, 45583033; each record is followed by one length byte.', 'warning');
           }
           if (levelData.metadata?.partial_recovery) {
             pushLog(`Partial recovery: ${levelData.metadata.recoverable_size}/${levelData.metadata.original_size} bytes survived.`, 'warning');
@@ -694,7 +796,9 @@ export default function useGameState() {
           }
           const out = a ^ b;
           pushLog(`0x${a.toString(16).toUpperCase().padStart(2, '0')} XOR 0x${b.toString(16).toUpperCase().padStart(2, '0')} = 0x${out.toString(16).toUpperCase().padStart(2, '0')} (${out})`, 'success');
-          if (currentLevel.requires_xor) completeObjective('find_key');
+          if (currentLevel.requires_xor && out === levelData?.metadata?.xor_key) {
+            completeObjective('find_key');
+          }
         }
         break;
 

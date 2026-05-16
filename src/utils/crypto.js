@@ -34,8 +34,9 @@ export function parseXorKey(input) {
   let value;
   if (trimmed.startsWith('0x') || trimmed.startsWith('0X')) {
     value = parseInt(trimmed, 16);
-  } else if (/^[0-9A-Fa-f]{1,2}$/.test(trimmed) && trimmed.length <= 2) {
-    // Could be hex, try decimal first if it looks numeric
+  } else if (/^\d{1,3}$/.test(trimmed)) {
+    value = parseInt(trimmed, 10);
+  } else if (/^[0-9A-Fa-f]{1,2}$/.test(trimmed)) {
     value = parseInt(trimmed, 16);
   } else {
     value = parseInt(trimmed, 10);

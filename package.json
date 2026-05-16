@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "preview": "vite preview",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "levels:build": "python3 scripts/level_generation/build_levels.py",
+    "level:generate": "python3 scripts/level_generation/generate_level.py"
   },
   "dependencies": {
     "react": "^18.2.0",

@@ -26,7 +26,7 @@ export default function SignatureReference() {
       {isOpen && (
         <div className="p-3">
           <div className="text-[10px] text-gray-500 mb-2 leading-relaxed">
-            Known file signatures used in forensic carving. Match header <em>and</em> footer for valid recovery.
+            Known file signatures and cleartext markers used in forensic carving. Match header <em>and</em> footer where available.
           </div>
           <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
             {entries.map(([key, sig]) => (

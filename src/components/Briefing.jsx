@@ -123,6 +123,26 @@ export default function Briefing({ level, onStart }) {
                   </div>
                 )}
               </div>
+
+              {/* Worked Example — shown for levels with walkthroughExample (e.g. MBR) */}
+              {level.walkthroughExample && (
+                <div className="bg-amber-950/20 border border-amber-700/30 rounded-lg p-4 mb-4">
+                  <div className="text-[10px] text-amber-400 uppercase tracking-[0.2em] mb-2 font-bold flex items-center gap-1.5">
+                    <span>📝</span>
+                    {level.walkthroughExample.title}
+                  </div>
+                  <div className="space-y-2">
+                    {level.walkthroughExample.steps.map((step, i) => (
+                      <div key={i} className="flex items-start gap-2 text-[11px]">
+                        <span className="text-amber-500 bg-amber-950/50 rounded w-5 h-5 flex items-center justify-center shrink-0 text-[9px] font-mono border border-amber-800/40 mt-0.5">
+                          {i + 1}
+                        </span>
+                        <span className="text-gray-300 leading-relaxed font-mono">{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
