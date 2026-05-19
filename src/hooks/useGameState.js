@@ -38,7 +38,6 @@ export default function useGameState() {
 
   // --- Workbench ---
   const [stashedChunks, setStashedChunks] = useState([]);
-  const [journalEntries, setJournalEntries] = useState([]);
 
   // --- Carving result ---
   const [carvedUrl, setCarvedUrl] = useState(null);
@@ -46,6 +45,14 @@ export default function useGameState() {
   const [pendingCaseResult, setPendingCaseResult] = useState(null);
   const [caseResults, setCaseResults] = useState(savedProgress?.caseResults || []);
   const [latestCaseResult, setLatestCaseResult] = useState(null);
+
+  // --- Knowledge checks ---
+  const [activeKnowledgeCheck, setActiveKnowledgeCheck] = useState(null);
+  const [knowledgeRecords, setKnowledgeRecords] = useState([]);
+  const [knowledgeCorrect, setKnowledgeCorrect] = useState(0);
+  const [knowledgeMistakes, setKnowledgeMistakes] = useState(0);
+  const knowledgeRecordsRef = useRef([]);
+  const activeKnowledgeCheckRef = useRef(null);
 
   // --- MBR unlock ---
   const [unlockedOffset, setUnlockedOffset] = useState(null);
@@ -107,16 +114,117 @@ export default function useGameState() {
 
   const currentLevel = CAMPAIGN[currentLevelIdx];
 
+  useEffect(() => {
+    knowledgeRecordsRef.current = knowledgeRecords;
+  }, [knowledgeRecords]);
+
+  useEffect(() => {
+    activeKnowledgeCheckRef.current = activeKnowledgeCheck;
+  }, [activeKnowledgeCheck]);
+
   // --- Logging ---
   const pushLog = useCallback((text, type = 'info') => {
     setLogs(prev => [...prev, { type, text }]);
   }, []);
 
+  const triggerKnowledgeCheck = useCallback((triggerObjective) => {
+    const checks = currentLevel?.knowledgeChecks || [];
+    const nextCheck = checks.find(check =>
+      check.triggerObjective === triggerObjective
+      && !knowledgeRecordsRef.current.some(record => record.id === check.id)
+    );
+
+    if (!nextCheck || activeKnowledgeCheckRef.current) return;
+
+    const shuffledOptions = [...(nextCheck.options || [])];
+    for (let i = shuffledOptions.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]];
+    }
+
+    const activatedCheck = {
+      ...nextCheck,
+      options: shuffledOptions,
+      attempts: 0,
+      feedback: null,
+      resolved: false,
+      lastCorrect: null,
+    };
+
+    activeKnowledgeCheckRef.current = activatedCheck;
+    setActiveKnowledgeCheck(activatedCheck);
+    pushLog(`Concept checkpoint unlocked: ${nextCheck.title}`, 'warning');
+    addTimelineEvent('knowledge', nextCheck.title);
+  }, [currentLevel, pushLog, addTimelineEvent]);
+
   // --- Completa un obiettivo ---
   const completeObjective = useCallback((objId) => {
+    const shouldTriggerCheck = objectives.some(o => o.id === objId && !o.completed);
+
     setObjectives(prev =>
       prev.map(o => o.id === objId ? { ...o, completed: true } : o)
     );
+
+    if (shouldTriggerCheck) {
+      triggerKnowledgeCheck(objId);
+    }
+  }, [objectives, triggerKnowledgeCheck]);
+
+  const answerKnowledgeCheck = useCallback((optionIdx) => {
+    const check = activeKnowledgeCheckRef.current;
+    if (!check || check.resolved) return;
+
+    const selected = check.options?.[optionIdx];
+    if (!selected) return;
+
+    const attempts = (check.attempts || 0) + 1;
+    const isCorrect = selected.correct === true || optionIdx === check.answerIndex;
+
+    if (isCorrect) {
+      const record = {
+        id: check.id,
+        title: check.title,
+        attempts,
+      };
+      setKnowledgeRecords(prev => {
+        const next = [...prev.filter(item => item.id !== check.id), record];
+        knowledgeRecordsRef.current = next;
+        return next;
+      });
+      setKnowledgeCorrect(prev => prev + 1);
+
+      const resolvedCheck = {
+        ...check,
+        attempts,
+        feedback: check.explanation,
+        resolved: true,
+        lastCorrect: true,
+      };
+      activeKnowledgeCheckRef.current = resolvedCheck;
+      setActiveKnowledgeCheck(resolvedCheck);
+      pushLog(`Concept checkpoint passed: ${check.title}`, 'success');
+      addTimelineEvent('knowledge', `Passed: ${check.title}`);
+      return;
+    }
+
+    setKnowledgeMistakes(prev => prev + 1);
+    const feedback = selected.feedback || 'This answer misses the forensic constraint. Review the concept and try again.';
+    const retryCheck = {
+      ...check,
+      attempts,
+      feedback,
+      resolved: false,
+      lastCorrect: false,
+    };
+    activeKnowledgeCheckRef.current = retryCheck;
+    setActiveKnowledgeCheck(retryCheck);
+    pushLog(`Concept checkpoint retry: ${feedback}`, 'error');
+  }, [pushLog, addTimelineEvent]);
+
+  const dismissKnowledgeCheck = useCallback(() => {
+    if (!activeKnowledgeCheckRef.current?.resolved) return;
+    activeKnowledgeCheckRef.current = null;
+    setActiveKnowledgeCheck(null);
   }, []);
 
   const getRangeRole = useCallback((start, end) => {
@@ -175,11 +283,16 @@ export default function useGameState() {
       setSelectionStart(null);
       setSelectionEnd(null);
       setStashedChunks([]);
-      setJournalEntries([]);
       setCarvedUrl(null);
       setCarvedText(null);
       setPendingCaseResult(null);
       setLatestCaseResult(null);
+      setActiveKnowledgeCheck(null);
+      activeKnowledgeCheckRef.current = null;
+      setKnowledgeRecords([]);
+      knowledgeRecordsRef.current = [];
+      setKnowledgeCorrect(0);
+      setKnowledgeMistakes(0);
       setUnlockedOffset(null);
       setHintsUsed(0);
       setCurrentHintIdx(0);
@@ -259,14 +372,6 @@ export default function useGameState() {
     newChunk.solutionIdx = assessment.solutionIdx;
 
     setStashedChunks(prev => [...prev, newChunk]);
-    setJournalEntries(prev => [...prev, {
-      id: newChunk.id,
-      start: sStart,
-      end: sEnd,
-      size: newChunk.size,
-      verdict: assessment.verdict,
-      note: assessment.note,
-    }]);
 
     const logType = ['valid', 'partial'].includes(assessment.verdict) ? 'success'
       : assessment.verdict === 'overlap' ? 'warning'
@@ -288,9 +393,8 @@ export default function useGameState() {
       if (diff === 'fragmented') {
         completeObjective(assessment.solutionIdx === 0 ? 'find_chunk1' : 'find_chunk2');
       }
-      if (diff === 'multi_sig') {
+      if (diff === '???') {
         completeObjective('identify_target');
-        completeObjective('avoid_pdf');
         completeObjective('select_range');
       }
       if (diff === 'ransomware') {
@@ -320,8 +424,7 @@ export default function useGameState() {
       arr.splice(toIdx, 0, item);
       return arr;
     });
-    completeObjective('order_chunks');
-  }, [completeObjective]);
+  }, []);
 
   // --- XOR Operation ---
   const applyXorOp = useCallback((keyInput) => {
@@ -384,6 +487,7 @@ export default function useGameState() {
     levelScore -= badSelections * 25;
     levelScore -= Math.max(0, carveAttempts - 1) * 30;
     levelScore -= reportAttempts * 40;
+    levelScore -= knowledgeMistakes * 20;
 
     if (timeElapsed <= meta.timeBonusThreshold) {
       const timeBonus = Math.round((1 - timeElapsed / meta.timeBonusThreshold) * 35);
@@ -403,8 +507,11 @@ export default function useGameState() {
       hintsUsed,
       badSelections,
       carveAttempts,
+      knowledgeCorrect,
+      knowledgeMistakes,
+      knowledgeCheckCount: meta.knowledgeChecks?.length || 0,
+      knowledgeRecords,
       elapsedTime: timeElapsed,
-      journalCount: journalEntries.length,
     };
 
     setScore(levelScore);
@@ -440,7 +547,9 @@ export default function useGameState() {
     badSelections,
     carveAttempts,
     reportAttempts,
-    journalEntries.length,
+    knowledgeCorrect,
+    knowledgeMistakes,
+    knowledgeRecords,
     stashedChunks,
   ]);
 
@@ -494,9 +603,6 @@ export default function useGameState() {
     }
 
     completeObjective('carve_file');
-    if (currentLevel.difficulty === 'fragmented') {
-      completeObjective('order_chunks');
-    }
     if (partialRecovery) {
       completeObjective('declare_limit');
     }
@@ -538,20 +644,61 @@ export default function useGameState() {
     if (!trimmed) return;
 
     pushLog(`> ${trimmed}`, 'command');
+    const firstSpaceIdx = trimmed.search(/\s/);
+    const command = firstSpaceIdx === -1
+      ? trimmed.toLowerCase()
+      : trimmed.slice(0, firstSpaceIdx).toLowerCase();
+    const rawArgString = firstSpaceIdx === -1 ? '' : trimmed.slice(firstSpaceIdx).trim();
     const args = trimmed.toLowerCase().split(/\s+/);
+    const runXorByteCalc = (left, right, mode) => {
+      const parseByte = (value) => {
+        if (mode === 'hex') {
+          const cleaned = value.replace(/^0x/i, '');
+          if (!/^[0-9a-f]{1,2}$/i.test(cleaned)) return null;
+          const parsed = parseInt(cleaned, 16);
+          return parsed >= 0 && parsed <= 255 ? parsed : null;
+        }
 
-    switch (args[0]) {
+        if (!/^\d{1,3}$/.test(value)) return null;
+        const parsed = parseInt(value, 10);
+        return parsed >= 0 && parsed <= 255 ? parsed : null;
+      };
+
+      const a = parseByte(left);
+      const b = parseByte(right);
+      if (a === null || b === null) {
+        pushLog(mode === 'hex'
+          ? 'xorhex expects hex byte values from 00 to FF. Example: xorhex 78 52'
+          : 'xordec expects decimal byte values from 0 to 255. Example: xordec 120 82',
+        'error');
+        return;
+      }
+
+      const out = a ^ b;
+      pushLog(`0x${a.toString(16).toUpperCase().padStart(2, '0')} XOR 0x${b.toString(16).toUpperCase().padStart(2, '0')} = 0x${out.toString(16).toUpperCase().padStart(2, '0')} (${out})`, 'success');
+      if (currentLevel.requires_xor && out === levelData?.metadata?.xor_key) {
+        completeObjective('find_key');
+      }
+    };
+
+    switch (command) {
       case 'help':
         pushLog('--- AVAILABLE COMMANDS ---', 'system');
         pushLog('  help              — Show this message', 'info');
         pushLog('  go <offset>       — Jump to byte offset / unlock MBR sector', 'info');
         pushLog('  select <a> <b>    — Select byte range by offsets, then stash', 'info');
         pushLog('  search <hex>      — Search for hex pattern (e.g. search 89504E47)', 'info');
+        pushLog('  hex2text <hex>    — Convert hex bytes to ASCII text', 'info');
+        pushLog('  text2hex <text>   — Convert text to hex bytes', 'info');
+        pushLog('  hex2dec <hex>     — Convert hex value(s) to decimal', 'info');
+        pushLog('  dec2hex <dec>     — Convert decimal value(s) to hex', 'info');
         pushLog('  entropy [size]    — Scan byte blocks for entropy anomalies', 'info');
         pushLog('  info              — Show current level metadata', 'info');
         pushLog('  hint              — Request an investigation hint (-15 pts)', 'info');
         pushLog('  xor <key>         — Apply XOR to workbench chunk (e.g. xor 0x1A)', 'info');
-        pushLog('  xorcalc <a> <b>   — XOR two bytes to derive a key (e.g. xorcalc 0x78 0x52)', 'info');
+        pushLog('  xorhex <a> <b>    — XOR two hex bytes to derive a key (e.g. xorhex 78 52)', 'info');
+        pushLog('  xordec <a> <b>    — XOR two decimal bytes to derive a key (e.g. xordec 120 82)', 'info');
+        pushLog('  xorcalc <0xA> <0xB> — Legacy explicit-hex XOR calculator', 'info');
         pushLog('  report <finding>  — Submit final finding: recovered | partial | inconclusive', 'info');
         pushLog('  clear             — Clear terminal output', 'info');
         pushLog('  status            — Show objectives and score', 'info');
@@ -580,7 +727,8 @@ export default function useGameState() {
             if (offset === levelData.metadata.partition_table_offset) {
               triggerGoTo(offset);
               pushLog(`Navigating to MBR partition table at offset ${offset} (0x${offset.toString(16).toUpperCase()}).`, 'success');
-              pushLog('Read bytes 8-11 of the first 16-byte entry, convert the Little-Endian LBA, then multiply by the sector size to unlock.', 'info');
+              pushLog('Read bytes 8-11 of the first 16-byte entry. Count entry bytes from 0: status=0, type=4, LBA start=8-11.', 'info');
+              pushLog('Reverse the four LBA bytes into normal hex, convert with hex2dec, then multiply by the sector size to unlock.', 'info');
               addTimelineEvent('navigate', `MBR table at 0x${offset.toString(16).toUpperCase()}`);
               completeObjective('read_mbr');
               break;
@@ -652,13 +800,90 @@ export default function useGameState() {
         }
         break;
 
+      case 'hex2text':
+        {
+          const cleanedHex = rawArgString
+            .replace(/(?:0x|\\x)/gi, '')
+            .replace(/[\s:_-]/g, '')
+            .toUpperCase();
+
+          if (!cleanedHex || cleanedHex.length % 2 !== 0 || /[^0-9A-F]/.test(cleanedHex)) {
+            pushLog('Usage: hex2text <even-length hex bytes> (e.g. hex2text 414243)', 'error');
+            break;
+          }
+
+          const text = cleanedHex.match(/.{2}/g)
+            .map(pair => parseInt(pair, 16))
+            .map(byte => (
+              byte >= 32 && byte <= 126
+                ? String.fromCharCode(byte)
+                : `\\x${byte.toString(16).toUpperCase().padStart(2, '0')}`
+            ))
+            .join('');
+          pushLog(`hex2text: ${text}`, 'success');
+        }
+        break;
+
+      case 'text2hex':
+        if (!rawArgString) {
+          pushLog('Usage: text2hex <text> (e.g. text2hex FR01)', 'error');
+          break;
+        }
+        {
+          const hex = Array.from(rawArgString)
+            .map(char => char.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0'))
+            .join(' ');
+          pushLog(`text2hex: ${hex}`, 'success');
+        }
+        break;
+
+      case 'hex2dec':
+        {
+          const values = rawArgString.split(/\s+/).filter(Boolean);
+          if (values.length === 0) {
+            pushLog('Usage: hex2dec <hex_value...> (e.g. hex2dec 0x1BE)', 'error');
+            break;
+          }
+
+          values.forEach(value => {
+            const cleaned = value.replace(/^0x/i, '').toUpperCase();
+            if (!cleaned || /[^0-9A-F]/.test(cleaned)) {
+              pushLog(`Invalid hex value: ${value}`, 'error');
+              return;
+            }
+            pushLog(`${value.toUpperCase()} = ${parseInt(cleaned, 16)}`, 'success');
+          });
+        }
+        break;
+
+      case 'dec2hex':
+        {
+          const values = rawArgString.split(/\s+/).filter(Boolean);
+          if (values.length === 0) {
+            pushLog('Usage: dec2hex <decimal_value...> (e.g. dec2hex 446)', 'error');
+            break;
+          }
+
+          values.forEach(value => {
+            if (!/^\d+$/.test(value)) {
+              pushLog(`Invalid decimal value: ${value}`, 'error');
+              return;
+            }
+            const parsed = parseInt(value, 10);
+            pushLog(`${value} = 0x${parsed.toString(16).toUpperCase()}`, 'success');
+          });
+        }
+        break;
+
       case 'entropy':
         {
           const requestedSize = args[1] ? parseInt(args[1], 10) : (levelData?.metadata?.entropy_block_size || 64);
           const blockSize = Number.isNaN(requestedSize)
             ? 64
             : Math.max(16, Math.min(256, requestedSize));
-          const bytes = hexBytes.map(b => parseInt(b, 16));
+          const mbrLocked = levelData?.difficulty === 'mbr' && unlockedOffset === null;
+          const readableHexBytes = mbrLocked ? hexBytes.slice(0, 512) : hexBytes;
+          const bytes = readableHexBytes.map(b => parseInt(b, 16));
           const blocks = [];
 
           for (let offset = 0; offset < bytes.length; offset += blockSize) {
@@ -695,6 +920,9 @@ export default function useGameState() {
             .slice(0, 6);
 
           pushLog(`Entropy scan: ${blockSize}B blocks | average H=${avgEntropy.toFixed(2)} bits/byte`, 'system');
+          if (mbrLocked) {
+            pushLog('Scope limited to readable MBR bytes. Encrypted sectors are excluded until unlocked.', 'warning');
+          }
           pushLog('Largest deviations from baseline. Low H / fewer unique bytes can indicate structured encoded payloads.', 'info');
           candidates.forEach((block, idx) => {
             const type = idx < 2 ? 'success' : 'info';
@@ -708,7 +936,7 @@ export default function useGameState() {
             const markers = levelData.metadata.payload_markers
               .map(m => `${m.label}=0x${m.offset.toString(16).toUpperCase()}`)
               .join(' | ');
-            pushLog(`Marker intel available: ${markers}. Cross-check with search 4E4D / search 4E58.`, 'warning');
+            pushLog(`Marker intel available: ${markers}. Convert marker labels with text2hex before searching their byte pattern.`, 'warning');
           }
           addTimelineEvent('entropy', `Entropy scan ${blockSize}B`);
         }
@@ -721,7 +949,9 @@ export default function useGameState() {
         }
         {
           const pattern = args.slice(1).join('').toUpperCase().replace(/\s/g, '');
-          const joined = hexBytes.join('').toUpperCase();
+          const mbrLocked = levelData?.difficulty === 'mbr' && unlockedOffset === null;
+          const readableHexBytes = mbrLocked ? hexBytes.slice(0, 512) : hexBytes;
+          const joined = readableHexBytes.join('').toUpperCase();
           const matches = [];
           let from = 0;
           while (matches.length < 8) {
@@ -731,13 +961,19 @@ export default function useGameState() {
             from = idx + Math.max(2, pattern.length);
           }
           if (matches.length > 0) {
+            if (mbrLocked) {
+              pushLog('Search scope: readable MBR only. Encrypted sectors are not indexed.', 'warning');
+            }
             pushLog(`Pattern found ${matches.length}${matches.length === 8 ? '+' : ''} time(s):`, 'success');
             matches.forEach(byteIdx => {
               pushLog(`  offset ${byteIdx} (0x${byteIdx.toString(16).toUpperCase()})`, 'success');
             });
             addTimelineEvent('search', `Found ${pattern} at ${matches.length} offset(s)`);
           } else {
-            pushLog(`Pattern "${pattern}" not found in current dump.`, 'error');
+            pushLog(`Pattern "${pattern}" not found in ${mbrLocked ? 'currently readable bytes' : 'current dump'}.`, 'error');
+            if (mbrLocked) {
+              pushLog('Encrypted sectors must be unlocked via the MBR-derived offset before search can inspect them.', 'warning');
+            }
             addTimelineEvent('search', `No match: ${pattern}`);
           }
         }
@@ -745,19 +981,28 @@ export default function useGameState() {
 
       case 'info':
         if (levelData) {
-          pushLog(`Level: ${levelData.difficulty} | Extension: .${levelData.target_extension} | Target size: ${levelData.target_size} bytes`, 'info');
-          if (levelData.metadata?.mbr_present) pushLog('MBR detected at offset 0. Partition table at 0x1BE.', 'info');
+          if (levelData.difficulty === '???') {
+            pushLog(`Level: ${levelData.difficulty} | Target size: ${levelData.target_size} bytes`, 'info');
+          } else {
+            pushLog(`Level: ${levelData.difficulty} | Extension: .${levelData.target_extension} | Target size: ${levelData.target_size} bytes`, 'info');
+          }
+          if (levelData.metadata?.mbr_present) {
+            pushLog('MBR detected at offset 0. Partition table at 0x1BE.', 'info');
+            if (levelData.metadata?.sector_size_hint) {
+              pushLog(`Sector size for this forensic image: ${levelData.metadata.sector_size_hint} bytes.`, 'info');
+            }
+          }
           if (levelData.metadata?.xor_encoded) {
-            pushLog('XOR obfuscation detected. Key is not provided; use known plaintext and xorcalc.', 'warning');
+            pushLog('XOR obfuscation detected. Key is not provided; use known plaintext with xorhex or xordec.', 'warning');
           }
           if (levelData.metadata?.payload_markers?.length) {
-            pushLog('Loader markers detected in case notes. Try search 4E4D (NM) and search 4E58 (NX) to enumerate XOR candidates.', 'warning');
+            pushLog('Loader markers detected in case notes. Convert marker labels with text2hex if you need their byte patterns.', 'warning');
           }
           if (levelData.metadata?.fragment_markers?.length) {
-            pushLog('Fragment run descriptors detected. Try search 46523031 (FR01) and search 46523032 (FR02); each descriptor is followed by a two-byte length.', 'warning');
+            pushLog('Fragment run descriptors detected. Convert descriptor labels with text2hex if you need their byte patterns; each descriptor is followed by a two-byte length.', 'warning');
           }
           if (levelData.metadata?.chunk_markers?.length) {
-            pushLog('Exfiltration records detected. Try search 45583031, 45583032, 45583033; each record is followed by one length byte.', 'warning');
+            pushLog('Exfiltration records detected. Convert record labels with text2hex if you need their byte patterns; each record is followed by one length byte.', 'warning');
           }
           if (levelData.metadata?.partial_recovery) {
             pushLog(`Partial recovery: ${levelData.metadata.recoverable_size}/${levelData.metadata.original_size} bytes survived.`, 'warning');
@@ -779,27 +1024,32 @@ export default function useGameState() {
 
       case 'xorcalc':
         if (args.length < 3) {
-          pushLog('Usage: xorcalc <byte_a> <byte_b> (e.g. xorcalc 0x78 0x52)', 'error');
+          pushLog('Usage: xorcalc <0xbyte_a> <0xbyte_b> (e.g. xorcalc 0x78 0x52). For unprefixed hex use xorhex; for decimal use xordec.', 'error');
           break;
         }
         {
-          const parseByte = (value) => {
-            const parsed = value.startsWith('0x') ? parseInt(value, 16) : parseInt(value, 10);
-            if (Number.isNaN(parsed) || parsed < 0 || parsed > 255) return null;
-            return parsed;
-          };
-          const a = parseByte(args[1]);
-          const b = parseByte(args[2]);
-          if (a === null || b === null) {
-            pushLog('xorcalc expects byte values between 0 and 255.', 'error');
+          if (!args[1].startsWith('0x') || !args[2].startsWith('0x')) {
+            pushLog('Ambiguous XOR input. Use xorhex <aa> <bb> for hex bytes, xordec <a> <b> for decimal bytes, or prefix both xorcalc values with 0x.', 'error');
             break;
           }
-          const out = a ^ b;
-          pushLog(`0x${a.toString(16).toUpperCase().padStart(2, '0')} XOR 0x${b.toString(16).toUpperCase().padStart(2, '0')} = 0x${out.toString(16).toUpperCase().padStart(2, '0')} (${out})`, 'success');
-          if (currentLevel.requires_xor && out === levelData?.metadata?.xor_key) {
-            completeObjective('find_key');
-          }
+          runXorByteCalc(args[1], args[2], 'hex');
         }
+        break;
+
+      case 'xorhex':
+        if (args.length < 3) {
+          pushLog('Usage: xorhex <hex_byte_a> <hex_byte_b> (e.g. xorhex 78 52)', 'error');
+          break;
+        }
+        runXorByteCalc(args[1], args[2], 'hex');
+        break;
+
+      case 'xordec':
+        if (args.length < 3) {
+          pushLog('Usage: xordec <decimal_byte_a> <decimal_byte_b> (e.g. xordec 120 82)', 'error');
+          break;
+        }
+        runXorByteCalc(args[1], args[2], 'dec');
         break;
 
       case 'report':
@@ -820,13 +1070,14 @@ export default function useGameState() {
           pushLog(`  ${o.completed ? '[x]' : '[ ]'} ${o.text}`, o.completed ? 'success' : 'info');
         });
         pushLog(`Hints used: ${hintsUsed} | Bad leads: ${badSelections} | Carves: ${carveAttempts} | Time: ${elapsedTime}s`, 'info');
+        pushLog(`Knowledge checks: ${knowledgeCorrect}/${currentLevel?.knowledgeChecks?.length || 0} passed | Retries: ${knowledgeMistakes}`, knowledgeMistakes > 0 ? 'warning' : 'success');
         if (pendingCaseResult) pushLog(`Awaiting report: report ${pendingCaseResult.expectedReport}`, 'warning');
         break;
 
       default:
-        pushLog(`Unknown command: "${args[0]}". Type "help" for available commands.`, 'error');
+        pushLog(`Unknown command: "${command}". Type "help" for available commands.`, 'error');
     }
-  }, [pushLog, levelData, hexBytes, objectives, hintsUsed, badSelections, carveAttempts, elapsedTime, pendingCaseResult, closeCase, currentLevel, completeObjective, useHint, applyXorOp, triggerGoTo, unlockedOffset, addTimelineEvent]);
+  }, [pushLog, levelData, hexBytes, objectives, hintsUsed, badSelections, carveAttempts, elapsedTime, pendingCaseResult, closeCase, currentLevel, completeObjective, useHint, applyXorOp, triggerGoTo, unlockedOffset, addTimelineEvent, knowledgeCorrect, knowledgeMistakes]);
 
   // --- Reset game ---
   const resetGame = useCallback(() => {
@@ -838,12 +1089,17 @@ export default function useGameState() {
     setCaseResults([]);
     setLatestCaseResult(null);
     setPendingCaseResult(null);
+    setActiveKnowledgeCheck(null);
+    activeKnowledgeCheckRef.current = null;
+    setKnowledgeRecords([]);
+    knowledgeRecordsRef.current = [];
+    setKnowledgeCorrect(0);
+    setKnowledgeMistakes(0);
     setTotalScore(0);
     setScore(0);
     setBadSelections(0);
     setCarveAttempts(0);
     setReportAttempts(0);
-    setJournalEntries([]);
     setTimelineEvents([]);
     timelineCountRef.current = 0;
     try { localStorage.removeItem('shattered_bytes_save'); } catch (e) { /* ignore */ }
@@ -861,6 +1117,12 @@ export default function useGameState() {
     setHexBytes([]);
     setLatestCaseResult(null);
     setPendingCaseResult(null);
+    setActiveKnowledgeCheck(null);
+    activeKnowledgeCheckRef.current = null;
+    setKnowledgeRecords([]);
+    knowledgeRecordsRef.current = [];
+    setKnowledgeCorrect(0);
+    setKnowledgeMistakes(0);
     setScore(0);
     setBadSelections(0);
     setCarveAttempts(0);
@@ -872,7 +1134,6 @@ export default function useGameState() {
     setCarvedUrl(null);
     setCarvedText(null);
     setUnlockedOffset(null);
-    setJournalEntries([]);
     setObjectives([]);
     setElapsedTime(0);
     setHintsUsed(0);
@@ -895,12 +1156,15 @@ export default function useGameState() {
     selectionEnd,
     isSelecting,
     stashedChunks,
-    journalEntries,
     carvedUrl,
     carvedText,
     pendingCaseResult,
     caseResults,
     latestCaseResult,
+    activeKnowledgeCheck,
+    knowledgeRecords,
+    knowledgeCorrect,
+    knowledgeMistakes,
     unlockedOffset,
     goToOffsetTrigger,
     logs,
@@ -928,6 +1192,8 @@ export default function useGameState() {
     useHint,
     executeCommand,
     pushLog,
+    answerKnowledgeCheck,
+    dismissKnowledgeCheck,
     resetGame,
     returnToMenu,
 

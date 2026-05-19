@@ -3,18 +3,35 @@ import { useState } from 'react';
 export default function Workbench({ chunks, onRemove, onMove, onCarve, onXor, levelData }) {
   const [xorInput, setXorInput] = useState('');
   const [dragIdx, setDragIdx] = useState(null);
+  const [dropTargetIdx, setDropTargetIdx] = useState(null);
 
-  const handleDragStart = (idx) => setDragIdx(idx);
+  const clearDragState = () => {
+    setDragIdx(null);
+    setDropTargetIdx(null);
+  };
+
+  const handleDragStart = (idx) => {
+    setDragIdx(idx);
+    setDropTargetIdx(null);
+  };
   const handleDragOver = (e, idx) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+    if (dragIdx !== null && dragIdx !== idx) {
+      setDropTargetIdx(idx);
+    }
   };
   const handleDrop = (e, toIdx) => {
     e.preventDefault();
     if (dragIdx !== null && dragIdx !== toIdx) {
       onMove(dragIdx, toIdx);
     }
-    setDragIdx(null);
+    clearDragState();
+  };
+
+  const getDropPlacement = (idx) => {
+    if (dragIdx === null || dropTargetIdx !== idx || dragIdx === idx) return null;
+    return dragIdx < idx ? 'after' : 'before';
   };
 
   const isXorLevel = levelData?.metadata?.xor_encoded;
@@ -39,39 +56,51 @@ export default function Workbench({ chunks, onRemove, onMove, onCarve, onXor, le
               Select bytes in the Hex Editor and click "Stash" to add fragments here.
             </p>
           )}
-          {chunks.map((chunk, i) => (
-            <div
-              key={chunk.id}
-              draggable
-              onDragStart={() => handleDragStart(i)}
-              onDragOver={(e) => handleDragOver(e, i)}
-              onDrop={(e) => handleDrop(e, i)}
-              className={`text-xs bg-gray-800/60 border rounded-md px-3 py-2 flex justify-between items-center group cursor-grab active:cursor-grabbing transition-all
-                ${dragIdx === i ? 'border-cyan-500 opacity-50' : 'border-gray-700/50 hover:border-gray-600'}`}
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-gray-600 select-none">⠿</span>
-                <span className="text-blue-400 font-bold shrink-0">FRAG_{String(i + 1).padStart(2, '0')}</span>
-                <span className="text-gray-500">{chunk.size}B</span>
-                <span className="text-gray-600 text-[10px] truncate">
-                  [0x{chunk.start.toString(16).toUpperCase()}]
-                </span>
-                {chunk.opApplied && (
-                  <span className="text-yellow-500 text-[10px] bg-yellow-900/30 px-1.5 py-0.5 rounded">
-                    {chunk.opApplied}
-                  </span>
+          {chunks.map((chunk, i) => {
+            const placement = getDropPlacement(i);
+            return (
+              <div key={chunk.id} className="relative">
+                {placement === 'before' && (
+                  <div className="pointer-events-none absolute -top-1 left-0 right-0 z-10 h-px bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.85)]" />
+                )}
+                <div
+                  draggable
+                  onDragStart={() => handleDragStart(i)}
+                  onDragOver={(e) => handleDragOver(e, i)}
+                  onDragEnter={(e) => handleDragOver(e, i)}
+                  onDragEnd={clearDragState}
+                  onDrop={(e) => handleDrop(e, i)}
+                  className={`text-xs bg-gray-800/60 border rounded-md px-3 py-2 flex justify-between items-center group cursor-grab active:cursor-grabbing transition-all
+                    ${dragIdx === i ? 'border-cyan-500 opacity-50' : 'border-gray-700/50 hover:border-gray-600'}
+                    ${placement ? 'bg-cyan-950/30 border-cyan-700/60' : ''}`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-gray-600 select-none">⠿</span>
+                    <span className="text-blue-400 font-bold shrink-0">FRAG_{String(i + 1).padStart(2, '0')}</span>
+                    <span className="text-gray-500">{chunk.size}B</span>
+                    <span className="text-gray-600 text-[10px] truncate">
+                      [0x{chunk.start.toString(16).toUpperCase()}]
+                    </span>
+                    {chunk.opApplied && (
+                      <span className="text-yellow-500 text-[10px] bg-yellow-900/30 px-1.5 py-0.5 rounded">
+                        {chunk.opApplied}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => onRemove(chunk.id)}
+                    className="text-red-500/50 hover:text-red-400 text-sm opacity-0 group-hover:opacity-100 transition-opacity ml-2"
+                  >
+                    ×
+                  </button>
+                </div>
+                {placement === 'after' && (
+                  <div className="pointer-events-none absolute -bottom-1 left-0 right-0 z-10 h-px bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.85)]" />
                 )}
               </div>
-              <button
-                onClick={() => onRemove(chunk.id)}
-                className="text-red-500/50 hover:text-red-400 text-sm opacity-0 group-hover:opacity-100 transition-opacity ml-2"
-              >
-                ×
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
-
         {/* XOR controls */}
         {isXorLevel && (
           <div className="border border-purple-800/40 rounded-md p-2.5 bg-purple-950/20">

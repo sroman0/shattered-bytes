@@ -13,19 +13,18 @@ import Workbench from './components/Workbench';
 import HexEditor from './components/HexEditor';
 import AssetViewer from './components/AssetViewer';
 import ScoreBoard from './components/ScoreBoard';
-import EvidenceJournal from './components/EvidenceJournal';
 import SignatureReference from './components/SignatureReference';
-import ForensicNotepad from './components/ForensicNotepad';
 import InvestigationTimeline from './components/InvestigationTimeline';
 import ObjectiveToast from './components/ObjectiveToast';
+import KnowledgeCheck from './components/KnowledgeCheck';
 
 export default function App() {
   const game = useGameState();
   const { GAME_PHASE, CAMPAIGN } = game;
-  const [hasNotes, setHasNotes] = useState(false);
   const [showBoot, setShowBoot] = useState(true);
   const [showIntro, setShowIntro] = useState(true);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [reviewBriefingOpen, setReviewBriefingOpen] = useState(false);
   const [tutorialSeen, setTutorialSeen] = useState(() => {
     try { return localStorage.getItem('shattered_bytes_tutorial_seen') === '1'; } catch { return false; }
   });
@@ -72,6 +71,14 @@ export default function App() {
     setShowIntro(false);
   }, []);
 
+  const handleSelectCaseFile = useCallback((idx) => {
+    if (idx === game.currentLevelIdx && game.levelData) {
+      setReviewBriefingOpen(true);
+      return;
+    }
+    game.loadLevel(idx);
+  }, [game]);
+
   // --- Boot Sequence ---
   if (showBoot) {
     return <BootSequence onComplete={handleBootComplete} />;
@@ -111,8 +118,22 @@ export default function App() {
         <Briefing level={game.currentLevel} onStart={game.startPlaying} />
       )}
 
+      {reviewBriefingOpen && game.currentLevel && (
+        <Briefing
+          level={game.currentLevel}
+          onStart={() => setReviewBriefingOpen(false)}
+          ctaLabel="Return to Investigation"
+        />
+      )}
+
       {/* Objective toast notifications */}
       <ObjectiveToast objectives={game.objectives} />
+
+      <KnowledgeCheck
+        check={game.activeKnowledgeCheck}
+        onAnswer={game.answerKnowledgeCheck}
+        onContinue={game.dismissKnowledgeCheck}
+      />
 
       {/* Score / Victory / Campaign end overlays */}
       <ScoreBoard
@@ -156,7 +177,7 @@ export default function App() {
             currentLevelIdx={game.currentLevelIdx}
             completedLevels={game.completedLevels}
             levelData={game.levelData}
-            onSelectLevel={game.loadLevel}
+            onSelectLevel={handleSelectCaseFile}
             phase={game.phase}
             GAME_PHASE={GAME_PHASE}
           />
@@ -172,8 +193,6 @@ export default function App() {
 
           <SignatureReference />
 
-          <ForensicNotepad onNoteChange={(text) => setHasNotes(text.length > 0)} />
-
           <Workbench
             chunks={game.stashedChunks}
             onRemove={game.removeStash}
@@ -181,13 +200,6 @@ export default function App() {
             onCarve={game.carveData}
             onXor={game.applyXorOp}
             levelData={game.levelData}
-          />
-
-          <EvidenceJournal
-            entries={game.journalEntries}
-            badSelections={game.badSelections}
-            carveAttempts={game.carveAttempts}
-            pendingCaseResult={game.pendingCaseResult}
           />
 
           {game.phase === GAME_PHASE.PLAYING && game.timelineEvents.length > 0 && (

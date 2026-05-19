@@ -1,9 +1,14 @@
 import { useState } from 'react';
 import { KNOWN_SIGNATURES, STORY } from '../data/campaign';
 
-export default function Briefing({ level, onStart }) {
+export default function Briefing({ level, onStart, ctaLabel = 'Begin Investigation' }) {
   const concept = level.forensicConcept;
   const [activeTab, setActiveTab] = useState('mission');
+  const fallbackLabels = ['Case context', 'Evidence target', 'Complication', 'Investigation method', 'Reporting standard'];
+  const briefingSections = level.briefingSections || level.briefing.map((body, i) => ({
+    label: fallbackLabels[i] || `Briefing ${i + 1}`,
+    body,
+  }));
 
   return (
     <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 backdrop-blur-sm p-4">
@@ -60,8 +65,13 @@ export default function Briefing({ level, onStart }) {
               </div>
 
               <div className="space-y-2 mb-4">
-                {level.briefing.map((line, i) => (
-                  <p key={i} className="text-[13px] text-gray-300 leading-relaxed">{line}</p>
+                {briefingSections.map((section, i) => (
+                  <div key={section.label || i} className="bg-gray-950/40 border border-gray-800/70 rounded-lg px-3.5 py-2.5">
+                    <div className="text-[9px] text-gray-500 uppercase tracking-[0.18em] mb-1 font-bold">
+                      {section.label}
+                    </div>
+                    <p className="text-[12px] text-gray-300 leading-relaxed">{section.body}</p>
+                  </div>
                 ))}
               </div>
 
@@ -159,7 +169,7 @@ export default function Briefing({ level, onStart }) {
             className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-2.5 rounded-lg text-sm transition-all tracking-wider uppercase"
             style={{ boxShadow: '0 0 20px rgba(6,182,212,0.2)' }}
           >
-            Begin Investigation
+            {ctaLabel}
           </button>
         </div>
       </div>

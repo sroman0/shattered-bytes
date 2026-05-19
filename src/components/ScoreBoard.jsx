@@ -52,8 +52,11 @@ export default function ScoreBoard({
       acc.carveAttempts += r.carveAttempts;
       acc.hintsUsed += r.hintsUsed;
       acc.elapsedTime += r.elapsedTime;
+      acc.knowledgeCorrect += r.knowledgeCorrect || 0;
+      acc.knowledgeMistakes += r.knowledgeMistakes || 0;
+      acc.knowledgeCheckCount += r.knowledgeCheckCount || 0;
       return acc;
-    }, { badSelections: 0, carveAttempts: 0, hintsUsed: 0, elapsedTime: 0 });
+    }, { badSelections: 0, carveAttempts: 0, hintsUsed: 0, elapsedTime: 0, knowledgeCorrect: 0, knowledgeMistakes: 0, knowledgeCheckCount: 0 });
     const partialHandled = caseResults.some(r => r.report === 'partial');
     const maxTotal = caseResults.reduce((sum, r) => sum + r.maxScore, 0);
     const masteryRatio = maxTotal > 0 ? totalScore / maxTotal : 0;
@@ -89,6 +92,7 @@ export default function ScoreBoard({
               ['Fragment reconstruction', caseResults.some(r => r.title.includes('Fracture')) ? 'High' : 'Medium'],
               ['Trial-and-error discipline', rate(totals.badSelections + extraCarves, 0, 2)],
               ['Obfuscation handling', caseResults.some(r => r.obfuscationHandled) ? 'High' : 'Medium'],
+              ['Concept assimilation', totals.knowledgeMistakes === 0 ? 'High' : totals.knowledgeMistakes <= 2 ? 'Medium' : 'Low'],
               ['Forensic reasoning', partialHandled ? 'High' : 'Medium'],
               ['Reporting quality', caseResults.every(r => ['recovered', 'partial'].includes(r.report)) ? 'High' : 'Medium'],
             ].map(([label, value]) => (
@@ -106,7 +110,7 @@ export default function ScoreBoard({
               <div key={r.levelId} className="flex justify-between gap-3 text-xs bg-gray-950/40 border border-gray-800 rounded px-3 py-1.5">
                 <span className="text-gray-300 truncate">{r.title}</span>
                 <span className="text-gray-500 shrink-0">
-                  {r.report} | {r.score}/{r.maxScore} | {formatTime(r.elapsedTime)}
+                  {r.report} | {r.score}/{r.maxScore} | KC {r.knowledgeCorrect || 0}/{r.knowledgeCheckCount || 0} | {formatTime(r.elapsedTime)}
                 </span>
               </div>
             ))}
@@ -166,6 +170,16 @@ export default function ScoreBoard({
             <div className="text-[9px] text-gray-500 uppercase mt-0.5">Hints</div>
           </div>
         </div>
+
+        {latestCaseResult && (
+          <div className="bg-amber-950/20 border border-amber-800/40 rounded-lg px-3.5 py-3 mb-5">
+            <div className="text-[9px] text-amber-500 uppercase tracking-[0.22em] mb-1 font-bold">Concept Assimilation</div>
+            <p className="text-xs text-gray-300 leading-relaxed">
+              Knowledge checks passed: <span className="text-amber-300 font-bold">{latestCaseResult.knowledgeCorrect || 0}/{latestCaseResult.knowledgeCheckCount || 0}</span>
+              {' '}with <span className={latestCaseResult.knowledgeMistakes ? 'text-red-300 font-bold' : 'text-green-300 font-bold'}>{latestCaseResult.knowledgeMistakes || 0}</span> retry penalty.
+            </p>
+          </div>
+        )}
 
         {/* Objectives recap */}
         <div className="mb-5 space-y-1.5">

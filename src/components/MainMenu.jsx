@@ -1,4 +1,5 @@
 import { CAMPAIGN, STORY } from '../data/campaign';
+import titleLogo from '../../title-removebg-preview.png';
 
 export default function MainMenu({ onStart, onHowToPlay, completedLevels, totalScore }) {
   const hasProgress = completedLevels.length > 0;
@@ -21,24 +22,15 @@ export default function MainMenu({ onStart, onHowToPlay, completedLevels, totalS
       <div className="relative z-10 text-center max-w-2xl mx-auto px-4">
         {/* Logo */}
         <div className="mb-2">
-          <div className="text-[10px] text-cyan-600/60 uppercase tracking-[0.5em] mb-3">
-            Digital Forensics Division
-          </div>
-          <h1 className="text-5xl font-bold tracking-[0.2em] text-green-400 mb-3"
-              style={{ textShadow: '0 0 20px rgba(74,222,128,0.4), 0 0 40px rgba(74,222,128,0.15)' }}>
-            SHATTERED
-          </h1>
-          <h1 className="text-5xl font-bold tracking-[0.2em] text-green-500/80 -mt-2"
-              style={{ textShadow: '0 0 20px rgba(74,222,128,0.3), 0 0 40px rgba(74,222,128,0.1)' }}>
-            BYTES
-          </h1>
+          <img
+            src={titleLogo}
+            alt="Shattered Bytes"
+            className="mx-auto -my-8 w-[min(92vw,520px)] h-auto object-contain drop-shadow-[0_0_24px_rgba(34,211,238,0.22)]"
+          />
         </div>
 
         <div className="w-48 h-px mx-auto bg-gradient-to-r from-transparent via-green-500/50 to-transparent mb-6" />
 
-        <p className="text-gray-400 text-sm mb-2 max-w-md mx-auto leading-relaxed">
-          A Serious Game on <span className="text-green-400 font-semibold">Data Carving</span> & Digital Forensics
-        </p>
         <p className="text-cyan-500/70 text-[10px] uppercase tracking-[0.22em] mb-2">
           {STORY.operation}
         </p>

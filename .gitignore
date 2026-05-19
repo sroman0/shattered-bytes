@@ -27,3 +27,4 @@ __pycache__/
 *.fls
 *.fdb_latexmk
 docs/presentation/out/
+docs/STUDY_GUIDE_THEORY.md

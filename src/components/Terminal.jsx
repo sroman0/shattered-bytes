@@ -8,15 +8,27 @@ export default function Terminal({ logs, onCommand }) {
   const endRef = useRef(null);
   const inputRef = useRef(null);
 
+  const focusInputIfNoTextSelection = () => {
+    const selectedText = window.getSelection?.().toString();
+    if (selectedText && selectedText.length > 0) return;
+    inputRef.current?.focus();
+  };
+
   const commands = [
     ['help', 'Print the command list in the terminal log.'],
     ['select <a> <b>', 'Select byte range by offsets, e.g. select 0x8CE 0xA22.'],
-    ['search <hex>', 'Find byte-pattern offsets, e.g. search 89504E47.'],
+    ['search <hex>', 'Find byte-pattern offsets in currently readable bytes.'],
+    ['hex2text <hex>', 'Convert hex bytes to ASCII text.'],
+    ['text2hex <text>', 'Convert text labels to hex bytes.'],
+    ['hex2dec <hex>', 'Convert hex value(s) to decimal.'],
+    ['dec2hex <dec>', 'Convert decimal value(s) to hex.'],
     ['entropy [size]', 'Scan byte blocks for entropy anomalies, default 64 bytes.'],
     ['info', 'Show metadata for the current evidence dump.'],
     ['status', 'Show objectives, hints, attempts, and time.'],
     ['hint', 'Request the next hint with score penalty.'],
-    ['xorcalc <a> <b>', 'XOR two bytes to derive a key, e.g. xorcalc 0x78 0x52.'],
+    ['xorhex <a> <b>', 'XOR two hex bytes to derive a key, e.g. xorhex 78 52.'],
+    ['xordec <a> <b>', 'XOR two decimal bytes to derive a key, e.g. xordec 120 82.'],
+    ['xorcalc <0xA> <0xB>', 'Legacy explicit-hex XOR calculator.'],
     ['xor <key>', 'Apply XOR to the current Workbench fragment.'],
     ['report recovered', 'Submit a complete-recovery finding.'],
     ['report partial', 'Submit a partial-recovery finding.'],
@@ -98,12 +110,7 @@ export default function Terminal({ logs, onCommand }) {
             title="Show terminal command guide"
           >
             Commands
-          </button>
-          <div className="flex gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-full bg-red-500/70" />
-            <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/70" />
-            <div className="w-2.5 h-2.5 rounded-full bg-green-500/70" />
-          </div>
+          </button>          
         </div>
       </div>
 
@@ -114,7 +121,7 @@ export default function Terminal({ logs, onCommand }) {
           </div>
           <div className="space-y-1 max-h-44 overflow-y-auto pr-1">
             {commands.map(([command, description]) => (
-              <div key={command} className="grid grid-cols-[112px_1fr] gap-2 text-[10px] leading-relaxed">
+              <div key={command} className="grid grid-cols-[140px_1fr] gap-2 text-[10px] leading-relaxed">
                 <code className="text-green-300 bg-black/30 border border-gray-800 rounded px-1.5 py-0.5 whitespace-nowrap">
                   {command}
                 </code>
@@ -126,8 +133,8 @@ export default function Terminal({ logs, onCommand }) {
       )}
 
       <div
-        className="flex-1 overflow-y-auto p-3 text-xs font-mono space-y-0.5 bg-black/60 cursor-text min-h-0"
-        onClick={() => inputRef.current?.focus()}
+        className="flex-1 overflow-y-auto p-3 text-xs font-mono space-y-0.5 bg-black/60 cursor-text min-h-0 select-text"
+        onClick={focusInputIfNoTextSelection}
       >
         {logs.map((log, i) => (
           <div key={i} className={`${getLogColor(log.type)} leading-relaxed flex`}>

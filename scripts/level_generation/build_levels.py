@@ -207,7 +207,7 @@ def level_3():
 
     return {
         "level_id": str(uuid.uuid4()),
-        "difficulty": "multi_sig",
+        "difficulty": "???",
         "target_extension": "jpg",
         "target_size": len(target),
         "hex_dump": dump.hex().upper(),

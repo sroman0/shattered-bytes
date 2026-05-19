@@ -29,6 +29,7 @@ export default function Header({ totalScore, elapsedTime, phase, GAME_PHASE, obj
 
         <div className="flex items-center gap-3">
           {/* Objectives progress */}
+          {/* TODO: rememeber to delete */}
           {/* {phase === GAME_PHASE.PLAYING && totalObjectives > 0 && (
             <div className="flex items-center gap-2 bg-gray-800/50 px-3 py-1.5 rounded border border-gray-700/50">
               <span className="text-[10px] text-gray-500 uppercase">Objectives</span>
@@ -78,6 +79,7 @@ export default function Header({ totalScore, elapsedTime, phase, GAME_PHASE, obj
             </svg>
           </button>
 
+          {/* TODO: rememeber to delete */}
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"
             style={{ boxShadow: '0 0 8px rgba(74,222,128,0.8)' }} />
         </div>
