@@ -20,6 +20,9 @@ __pycache__/
 *.vrb
 *.fls
 *.fdb_latexmk
+
+# docs
 docs/presentation/out/
 docs/WALKTHROUGH.md
 docs/STUDY_GUIDE_THEORY.md
+docs/DEPLOYMENT.md

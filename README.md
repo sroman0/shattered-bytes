@@ -79,8 +79,8 @@ The **Investigation Timeline** records commands, searches, selections, stash ope
 
 1. Clone the repository:
    ```bash
-   git clone <repository-url>
-   cd Serious_game_CFCA
+   git clone https://github.com/sroman0/shattered-bytes.git
+   cd shattered-bytes
    ```
 
 2. Install dependencies:
@@ -117,7 +117,7 @@ The project is ready for GitHub Pages deployment through the workflow in `.githu
 Expected demo URL for the current repository:
 
 ```text
-https://sroman0.github.io/Serious_game_CFCA/
+https://sroman0.github.io/shattered-bytes/
 ```
 
 See [Live Demo Deployment](docs/DEPLOYMENT.md) for the exact GitHub Pages setup steps.

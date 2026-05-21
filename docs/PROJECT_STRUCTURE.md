@@ -3,7 +3,7 @@
 This document summarizes how the repository is organized and where each kind of project material should live.
 
 ```text
-Serious_game_CFCA/
+shattered-bytes/
 ├── assets/                  # Source visuals and media used by gameplay and level generation
 │   └── media/               # Source intro videos and related media
 ├── docs/                    # Project documentation, report, walkthrough, study material, and presentation
