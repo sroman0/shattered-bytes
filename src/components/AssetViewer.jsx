@@ -1,11 +1,13 @@
 import { useState } from 'react';
 
+const publicAsset = (path) => `${import.meta.env.BASE_URL}${path}`;
+
 // Map level IDs to full-size evidence images in public/evidence/
 const EVIDENCE_IMAGE_MAP = {
-  level_1: '/evidence/evidence_chat.png',
-  level_2: '/evidence/evidence_document.png',
-  level_3: '/evidence/evidence_surveillance.png',
-  level_4: '/evidence/evidence_transaction.png',
+  level_1: publicAsset('evidence/evidence_chat.png'),
+  level_2: publicAsset('evidence/evidence_document.png'),
+  level_3: publicAsset('evidence/evidence_surveillance.png'),
+  level_4: publicAsset('evidence/evidence_transaction.png'),
 };
 
 export default function AssetViewer({ carvedUrl, carvedText, currentLevelId }) {

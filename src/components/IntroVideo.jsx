@@ -96,7 +96,7 @@ export default function IntroVideo({ onComplete }) {
     >
       <video
         ref={videoRef}
-        src="/intro.mp4"
+        src={`${import.meta.env.BASE_URL}intro.mp4`}
         autoPlay
         playsInline
         muted={!audioEnabled}

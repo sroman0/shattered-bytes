@@ -110,6 +110,18 @@ If you modify the level scripts or source assets, you can regenerate the JSON le
 npm run levels:build
 ```
 
+## Live Demo Deployment
+
+The project is ready for GitHub Pages deployment through the workflow in `.github/workflows/deploy.yml`.
+
+Expected demo URL for the current repository:
+
+```text
+https://sroman0.github.io/Serious_game_CFCA/
+```
+
+See [Live Demo Deployment](docs/DEPLOYMENT.md) for the exact GitHub Pages setup steps.
+
 ## Project Structure
 
 - `src/` - React application source code (Components, Hooks, Data, Utils).

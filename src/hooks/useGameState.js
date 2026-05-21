@@ -274,11 +274,11 @@ export default function useGameState() {
       const meta = CAMPAIGN[idx];
       pushLog(`Loading ${meta.title}...`, 'system');
 
-      const response = await fetch(`/levels/${meta.id}.json`);
+      const response = await fetch(`${import.meta.env.BASE_URL}levels/${meta.id}.json`);
       if (!response.ok) throw new Error('Level data not found on disk');
       const data = await response.json();
 
-      // Reset tutto
+      // Reset level state.
       setLevelData(data);
       setCurrentLevelIdx(idx);
       setHexBytes(parseHexDump(data.hex_dump));
