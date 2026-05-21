@@ -7,6 +7,7 @@ export default function IntroVideo({ onComplete }) {
   const [fading, setFading] = useState(false);
   const [needsGesture, setNeedsGesture] = useState(false);
   const [buffering, setBuffering] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(false);
 
   const finish = useCallback((skipped = false) => {
     if (completionRef.current) return;
@@ -21,7 +22,8 @@ export default function IntroVideo({ onComplete }) {
     if (!video || completionRef.current || fading) return;
 
     try {
-      video.muted = true;
+      video.muted = !audioEnabled;
+      video.volume = audioEnabled ? 1 : 0;
       video.playsInline = true;
       const result = video.play();
       if (result) await result;
@@ -33,7 +35,25 @@ export default function IntroVideo({ onComplete }) {
       setNeedsGesture(true);
       setBuffering(false);
     }
-  }, [fading]);
+  }, [audioEnabled, fading]);
+
+  const enableAudio = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video || completionRef.current) return;
+
+    try {
+      video.muted = false;
+      video.volume = 1;
+      setAudioEnabled(true);
+      const result = video.play();
+      if (result) await result;
+      setNeedsGesture(false);
+      setBuffering(false);
+    } catch {
+      setNeedsGesture(true);
+      setBuffering(false);
+    }
+  }, []);
 
   const retrySoon = useCallback(() => {
     if (completionRef.current) return;
@@ -79,7 +99,7 @@ export default function IntroVideo({ onComplete }) {
         src="/intro.mp4"
         autoPlay
         playsInline
-        muted
+        muted={!audioEnabled}
         preload="auto"
         onLoadedData={attemptPlay}
         onCanPlay={attemptPlay}
@@ -104,13 +124,13 @@ export default function IntroVideo({ onComplete }) {
       {needsGesture && (
         <button
           type="button"
-          onClick={attemptPlay}
+          onClick={enableAudio}
           className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2
                      bg-green-500/15 hover:bg-green-500/25 text-green-300 border border-green-500/50
                      px-5 py-3 rounded-md text-xs font-mono uppercase tracking-[0.22em]
                      transition-colors"
         >
-          Play Intro
+          Play Intro With Audio
         </button>
       )}
 
@@ -120,7 +140,19 @@ export default function IntroVideo({ onComplete }) {
         </div>
       )}
 
-      {/* Skip button — bottom right */}
+      {/* Skip button - bottom right */}
+      {!needsGesture && !audioEnabled && (
+        <button
+          type="button"
+          onClick={enableAudio}
+          className="absolute bottom-8 left-8 text-cyan-300 hover:text-white text-sm font-mono tracking-wider
+                     bg-black/40 hover:bg-black/70 backdrop-blur-sm px-4 py-2 rounded border border-cyan-700/50
+                     hover:border-cyan-400/60 transition-all duration-300 uppercase"
+        >
+          Enable Audio
+        </button>
+      )}
+
       <button
         onClick={skip}
         className="absolute bottom-8 right-8 text-gray-500 hover:text-white text-sm font-mono tracking-wider

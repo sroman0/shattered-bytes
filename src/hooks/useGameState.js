@@ -9,6 +9,7 @@ const GAME_PHASE = {
   BRIEFING: 'briefing',
   PLAYING: 'playing',
   VICTORY: 'victory',
+  TIMELINE_BOARD: 'timeline_board',
   CAMPAIGN_END: 'campaign_end',
 };
 
@@ -46,13 +47,13 @@ export default function useGameState() {
   const [caseResults, setCaseResults] = useState(savedProgress?.caseResults || []);
   const [latestCaseResult, setLatestCaseResult] = useState(null);
 
-  // --- Knowledge checks ---
-  const [activeKnowledgeCheck, setActiveKnowledgeCheck] = useState(null);
-  const [knowledgeRecords, setKnowledgeRecords] = useState([]);
-  const [knowledgeCorrect, setKnowledgeCorrect] = useState(0);
-  const [knowledgeMistakes, setKnowledgeMistakes] = useState(0);
-  const knowledgeRecordsRef = useRef([]);
-  const activeKnowledgeCheckRef = useRef(null);
+  // --- Forensic procedure checks ---
+  const [activeProcedureCheck, setActiveProcedureCheck] = useState(null);
+  const [procedureRecords, setProcedureRecords] = useState([]);
+  const [procedureCorrect, setProcedureCorrect] = useState(0);
+  const [procedureMistakes, setProcedureMistakes] = useState(0);
+  const procedureRecordsRef = useRef([]);
+  const activeProcedureCheckRef = useRef(null);
 
   // --- MBR unlock ---
   const [unlockedOffset, setUnlockedOffset] = useState(null);
@@ -115,26 +116,27 @@ export default function useGameState() {
   const currentLevel = CAMPAIGN[currentLevelIdx];
 
   useEffect(() => {
-    knowledgeRecordsRef.current = knowledgeRecords;
-  }, [knowledgeRecords]);
+    procedureRecordsRef.current = procedureRecords;
+  }, [procedureRecords]);
 
   useEffect(() => {
-    activeKnowledgeCheckRef.current = activeKnowledgeCheck;
-  }, [activeKnowledgeCheck]);
+    activeProcedureCheckRef.current = activeProcedureCheck;
+  }, [activeProcedureCheck]);
 
   // --- Logging ---
   const pushLog = useCallback((text, type = 'info') => {
     setLogs(prev => [...prev, { type, text }]);
   }, []);
 
-  const triggerKnowledgeCheck = useCallback((triggerObjective) => {
-    const checks = currentLevel?.knowledgeChecks || [];
+  const triggerProcedureCheck = useCallback((trigger, triggerObjective = null) => {
+    const checks = currentLevel?.procedureChecks || [];
     const nextCheck = checks.find(check =>
-      check.triggerObjective === triggerObjective
-      && !knowledgeRecordsRef.current.some(record => record.id === check.id)
+      check.trigger === trigger
+      && (triggerObjective === null || check.triggerObjective === triggerObjective)
+      && !procedureRecordsRef.current.some(record => record.id === check.id)
     );
 
-    if (!nextCheck || activeKnowledgeCheckRef.current) return;
+    if (!nextCheck || activeProcedureCheckRef.current) return;
 
     const shuffledOptions = [...(nextCheck.options || [])];
     for (let i = shuffledOptions.length - 1; i > 0; i -= 1) {
@@ -151,11 +153,68 @@ export default function useGameState() {
       lastCorrect: null,
     };
 
-    activeKnowledgeCheckRef.current = activatedCheck;
-    setActiveKnowledgeCheck(activatedCheck);
-    pushLog(`Concept checkpoint unlocked: ${nextCheck.title}`, 'warning');
-    addTimelineEvent('knowledge', nextCheck.title);
+    activeProcedureCheckRef.current = activatedCheck;
+    setActiveProcedureCheck(activatedCheck);
+    pushLog(`Forensic procedure check: ${nextCheck.title}`, 'warning');
+    addTimelineEvent('procedure', nextCheck.title);
   }, [currentLevel, pushLog, addTimelineEvent]);
+
+  const answerProcedureCheck = useCallback((optionIdx) => {
+    const check = activeProcedureCheckRef.current;
+    if (!check || check.resolved) return;
+
+    const selected = check.options?.[optionIdx];
+    if (!selected) return;
+
+    const attempts = (check.attempts || 0) + 1;
+    const isCorrect = selected.correct === true;
+
+    if (isCorrect) {
+      const record = {
+        id: check.id,
+        title: check.title,
+        attempts,
+      };
+      setProcedureRecords(prev => {
+        const next = [...prev.filter(item => item.id !== check.id), record];
+        procedureRecordsRef.current = next;
+        return next;
+      });
+      setProcedureCorrect(prev => prev + 1);
+
+      const resolvedCheck = {
+        ...check,
+        attempts,
+        feedback: check.explanation,
+        resolved: true,
+        lastCorrect: true,
+      };
+      activeProcedureCheckRef.current = resolvedCheck;
+      setActiveProcedureCheck(resolvedCheck);
+      pushLog(`Forensic procedure accepted: ${check.title}`, 'success');
+      addTimelineEvent('procedure', `Accepted: ${check.title}`);
+      return;
+    }
+
+    setProcedureMistakes(prev => prev + 1);
+    const feedback = selected.feedback || 'This answer weakens integrity, admissibility, or reporting discipline. Try again.';
+    const retryCheck = {
+      ...check,
+      attempts,
+      feedback,
+      resolved: false,
+      lastCorrect: false,
+    };
+    activeProcedureCheckRef.current = retryCheck;
+    setActiveProcedureCheck(retryCheck);
+    pushLog(`Forensic procedure risk: ${feedback}`, 'error');
+  }, [pushLog, addTimelineEvent]);
+
+  const dismissProcedureCheck = useCallback(() => {
+    if (!activeProcedureCheckRef.current?.resolved) return;
+    activeProcedureCheckRef.current = null;
+    setActiveProcedureCheck(null);
+  }, []);
 
   // --- Completa un obiettivo ---
   const completeObjective = useCallback((objId) => {
@@ -166,66 +225,9 @@ export default function useGameState() {
     );
 
     if (shouldTriggerCheck) {
-      triggerKnowledgeCheck(objId);
+      triggerProcedureCheck('objective', objId);
     }
-  }, [objectives, triggerKnowledgeCheck]);
-
-  const answerKnowledgeCheck = useCallback((optionIdx) => {
-    const check = activeKnowledgeCheckRef.current;
-    if (!check || check.resolved) return;
-
-    const selected = check.options?.[optionIdx];
-    if (!selected) return;
-
-    const attempts = (check.attempts || 0) + 1;
-    const isCorrect = selected.correct === true || optionIdx === check.answerIndex;
-
-    if (isCorrect) {
-      const record = {
-        id: check.id,
-        title: check.title,
-        attempts,
-      };
-      setKnowledgeRecords(prev => {
-        const next = [...prev.filter(item => item.id !== check.id), record];
-        knowledgeRecordsRef.current = next;
-        return next;
-      });
-      setKnowledgeCorrect(prev => prev + 1);
-
-      const resolvedCheck = {
-        ...check,
-        attempts,
-        feedback: check.explanation,
-        resolved: true,
-        lastCorrect: true,
-      };
-      activeKnowledgeCheckRef.current = resolvedCheck;
-      setActiveKnowledgeCheck(resolvedCheck);
-      pushLog(`Concept checkpoint passed: ${check.title}`, 'success');
-      addTimelineEvent('knowledge', `Passed: ${check.title}`);
-      return;
-    }
-
-    setKnowledgeMistakes(prev => prev + 1);
-    const feedback = selected.feedback || 'This answer misses the forensic constraint. Review the concept and try again.';
-    const retryCheck = {
-      ...check,
-      attempts,
-      feedback,
-      resolved: false,
-      lastCorrect: false,
-    };
-    activeKnowledgeCheckRef.current = retryCheck;
-    setActiveKnowledgeCheck(retryCheck);
-    pushLog(`Concept checkpoint retry: ${feedback}`, 'error');
-  }, [pushLog, addTimelineEvent]);
-
-  const dismissKnowledgeCheck = useCallback(() => {
-    if (!activeKnowledgeCheckRef.current?.resolved) return;
-    activeKnowledgeCheckRef.current = null;
-    setActiveKnowledgeCheck(null);
-  }, []);
+  }, [objectives, triggerProcedureCheck]);
 
   const getRangeRole = useCallback((start, end) => {
     const solutions = levelData?.solution_offsets || [];
@@ -287,12 +289,12 @@ export default function useGameState() {
       setCarvedText(null);
       setPendingCaseResult(null);
       setLatestCaseResult(null);
-      setActiveKnowledgeCheck(null);
-      activeKnowledgeCheckRef.current = null;
-      setKnowledgeRecords([]);
-      knowledgeRecordsRef.current = [];
-      setKnowledgeCorrect(0);
-      setKnowledgeMistakes(0);
+      setActiveProcedureCheck(null);
+      activeProcedureCheckRef.current = null;
+      setProcedureRecords([]);
+      procedureRecordsRef.current = [];
+      setProcedureCorrect(0);
+      setProcedureMistakes(0);
       setUnlockedOffset(null);
       setHintsUsed(0);
       setCurrentHintIdx(0);
@@ -334,7 +336,8 @@ export default function useGameState() {
         pushLog('INTEL: Single-byte XOR obfuscation suspected. Derive the key from known plaintext.', 'warning');
       }
     }
-  }, [currentLevel, hexBytes.length, levelData, pushLog]);
+    triggerProcedureCheck('start');
+  }, [currentLevel, hexBytes.length, levelData, pushLog, triggerProcedureCheck]);
 
   // --- Selezione byte ---
   const beginSelection = useCallback((absIdx) => {
@@ -393,7 +396,7 @@ export default function useGameState() {
       if (diff === 'fragmented') {
         completeObjective(assessment.solutionIdx === 0 ? 'find_chunk1' : 'find_chunk2');
       }
-      if (diff === '???') {
+      if (diff === 'multi_sig') {
         completeObjective('identify_target');
         completeObjective('select_range');
       }
@@ -487,7 +490,7 @@ export default function useGameState() {
     levelScore -= badSelections * 25;
     levelScore -= Math.max(0, carveAttempts - 1) * 30;
     levelScore -= reportAttempts * 40;
-    levelScore -= knowledgeMistakes * 20;
+    levelScore -= procedureMistakes * 15;
 
     if (timeElapsed <= meta.timeBonusThreshold) {
       const timeBonus = Math.round((1 - timeElapsed / meta.timeBonusThreshold) * 35);
@@ -507,10 +510,12 @@ export default function useGameState() {
       hintsUsed,
       badSelections,
       carveAttempts,
-      knowledgeCorrect,
-      knowledgeMistakes,
-      knowledgeCheckCount: meta.knowledgeChecks?.length || 0,
-      knowledgeRecords,
+      procedureCorrect,
+      procedureMistakes,
+      procedureCheckCount: meta.procedureChecks?.length || 0,
+      procedureRecords,
+      forensicFocus: meta.forensicFocus?.label,
+      limitation: meta.forensicFocus?.limitation,
       elapsedTime: timeElapsed,
     };
 
@@ -547,9 +552,9 @@ export default function useGameState() {
     badSelections,
     carveAttempts,
     reportAttempts,
-    knowledgeCorrect,
-    knowledgeMistakes,
-    knowledgeRecords,
+    procedureCorrect,
+    procedureMistakes,
+    procedureRecords,
     stashedChunks,
   ]);
 
@@ -612,21 +617,27 @@ export default function useGameState() {
       status: partialRecovery ? 'partial' : 'recovered',
       expectedReport,
     });
+    triggerProcedureCheck('post_carve');
     pushLog(`Payload validated. Submit final conclusion with: report ${expectedReport}`, 'warning');
-  }, [stashedChunks, levelData, pushLog, completeObjective, rangesMatchSolutions, currentLevel]);
+  }, [stashedChunks, levelData, pushLog, completeObjective, rangesMatchSolutions, currentLevel, triggerProcedureCheck]);
 
   // --- Avanza al livello successivo ---
   const nextLevel = useCallback(() => {
     if (currentLevelIdx + 1 < CAMPAIGN.length) {
       loadLevel(currentLevelIdx + 1);
     } else {
-      setPhase(GAME_PHASE.CAMPAIGN_END);
-      pushLog('ALL CASES CLOSED. Campaign complete.', 'success');
+      setPhase(GAME_PHASE.TIMELINE_BOARD);
+      pushLog('All case artefacts recovered. Reconstruct the incident chain before sealing the report.', 'warning');
     }
   }, [currentLevelIdx, loadLevel, pushLog]);
 
+  const completeTimelineBoard = useCallback(() => {
+    setPhase(GAME_PHASE.CAMPAIGN_END);
+    pushLog('ALL CASES CLOSED. Campaign complete.', 'success');
+  }, [pushLog]);
+
   // --- Hint ---
-  const useHint = useCallback(() => {
+  const requestHint = useCallback(() => {
     const meta = CAMPAIGN[currentLevelIdx];
     if (currentHintIdx >= meta.hints.length) {
       pushLog('No more hints available for this case.', 'error');
@@ -670,7 +681,7 @@ export default function useGameState() {
         pushLog(mode === 'hex'
           ? 'xorhex expects hex byte values from 00 to FF. Example: xorhex 78 52'
           : 'xordec expects decimal byte values from 0 to 255. Example: xordec 120 82',
-        'error');
+          'error');
         return;
       }
 
@@ -684,24 +695,24 @@ export default function useGameState() {
     switch (command) {
       case 'help':
         pushLog('--- AVAILABLE COMMANDS ---', 'system');
-        pushLog('  help              — Show this message', 'info');
-        pushLog('  go <offset>       — Jump to byte offset / unlock MBR sector', 'info');
-        pushLog('  select <a> <b>    — Select byte range by offsets, then stash', 'info');
-        pushLog('  search <hex>      — Search for hex pattern (e.g. search 89504E47)', 'info');
-        pushLog('  hex2text <hex>    — Convert hex bytes to ASCII text', 'info');
-        pushLog('  text2hex <text>   — Convert text to hex bytes', 'info');
-        pushLog('  hex2dec <hex>     — Convert hex value(s) to decimal', 'info');
-        pushLog('  dec2hex <dec>     — Convert decimal value(s) to hex', 'info');
-        pushLog('  entropy [size]    — Scan byte blocks for entropy anomalies', 'info');
-        pushLog('  info              — Show current level metadata', 'info');
-        pushLog('  hint              — Request an investigation hint (-15 pts)', 'info');
-        pushLog('  xor <key>         — Apply XOR to workbench chunk (e.g. xor 0x1A)', 'info');
-        pushLog('  xorhex <a> <b>    — XOR two hex bytes to derive a key (e.g. xorhex 78 52)', 'info');
-        pushLog('  xordec <a> <b>    — XOR two decimal bytes to derive a key (e.g. xordec 120 82)', 'info');
-        pushLog('  xorcalc <0xA> <0xB> — Legacy explicit-hex XOR calculator', 'info');
-        pushLog('  report <finding>  — Submit final finding: recovered | partial | inconclusive', 'info');
-        pushLog('  clear             — Clear terminal output', 'info');
-        pushLog('  status            — Show objectives and score', 'info');
+        pushLog('  help              - Show this message', 'info');
+        pushLog('  go <offset>       - Jump to byte offset / unlock MBR sector', 'info');
+        pushLog('  select <a> <b>    - Select byte range by offsets, then stash', 'info');
+        pushLog('  search <hex>      - Search for hex pattern (e.g. search 89504E47)', 'info');
+        pushLog('  hex2text <hex>    - Convert hex bytes to ASCII text', 'info');
+        pushLog('  text2hex <text>   - Convert text to hex bytes', 'info');
+        pushLog('  hex2dec <hex>     - Convert hex value(s) to decimal', 'info');
+        pushLog('  dec2hex <dec>     - Convert decimal value(s) to hex', 'info');
+        pushLog('  entropy [size]    - Scan byte blocks for entropy anomalies', 'info');
+        pushLog('  info              - Show current level metadata', 'info');
+        pushLog('  hint              - Request an investigation hint (-15 pts)', 'info');
+        pushLog('  xor <key>         - Apply XOR to workbench chunk (e.g. xor 0x1A)', 'info');
+        pushLog('  xorhex <a> <b>    - XOR two hex bytes to derive a key (e.g. xorhex 78 52)', 'info');
+        pushLog('  xordec <a> <b>    - XOR two decimal bytes to derive a key (e.g. xordec 120 82)', 'info');
+        pushLog('  xorcalc <0xA> <0xB> - Legacy explicit-hex XOR calculator', 'info');
+        pushLog('  report <finding>  - Submit final finding: recovered | partial | inconclusive', 'info');
+        pushLog('  clear             - Clear terminal output', 'info');
+        pushLog('  status            - Show objectives and score', 'info');
         break;
 
       case 'go':
@@ -771,7 +782,7 @@ export default function useGameState() {
           const rangeTokens = args
             .slice(1)
             .join(' ')
-            .replace(/\s*[-–—]\s*/, ' ')
+            .replace(/\s*[-–-]\s*/, ' ')
             .split(/\s+/)
             .filter(Boolean);
           const startToken = rangeTokens[0];
@@ -981,7 +992,7 @@ export default function useGameState() {
 
       case 'info':
         if (levelData) {
-          if (levelData.difficulty === '???') {
+          if (currentLevel?.difficulty === 'multi_sig') {
             pushLog(`Level: ${levelData.difficulty} | Target size: ${levelData.target_size} bytes`, 'info');
           } else {
             pushLog(`Level: ${levelData.difficulty} | Extension: .${levelData.target_extension} | Target size: ${levelData.target_size} bytes`, 'info');
@@ -1011,7 +1022,7 @@ export default function useGameState() {
         break;
 
       case 'hint':
-        useHint();
+        requestHint();
         break;
 
       case 'xor':
@@ -1070,14 +1081,14 @@ export default function useGameState() {
           pushLog(`  ${o.completed ? '[x]' : '[ ]'} ${o.text}`, o.completed ? 'success' : 'info');
         });
         pushLog(`Hints used: ${hintsUsed} | Bad leads: ${badSelections} | Carves: ${carveAttempts} | Time: ${elapsedTime}s`, 'info');
-        pushLog(`Knowledge checks: ${knowledgeCorrect}/${currentLevel?.knowledgeChecks?.length || 0} passed | Retries: ${knowledgeMistakes}`, knowledgeMistakes > 0 ? 'warning' : 'success');
+        pushLog(`Procedure checks: ${procedureCorrect}/${currentLevel?.procedureChecks?.length || 0} passed | Risks: ${procedureMistakes}`, procedureMistakes > 0 ? 'warning' : 'success');
         if (pendingCaseResult) pushLog(`Awaiting report: report ${pendingCaseResult.expectedReport}`, 'warning');
         break;
 
       default:
         pushLog(`Unknown command: "${command}". Type "help" for available commands.`, 'error');
     }
-  }, [pushLog, levelData, hexBytes, objectives, hintsUsed, badSelections, carveAttempts, elapsedTime, pendingCaseResult, closeCase, currentLevel, completeObjective, useHint, applyXorOp, triggerGoTo, unlockedOffset, addTimelineEvent, knowledgeCorrect, knowledgeMistakes]);
+  }, [pushLog, levelData, hexBytes, objectives, hintsUsed, badSelections, carveAttempts, elapsedTime, pendingCaseResult, closeCase, currentLevel, completeObjective, requestHint, applyXorOp, triggerGoTo, unlockedOffset, addTimelineEvent, procedureCorrect, procedureMistakes]);
 
   // --- Reset game ---
   const resetGame = useCallback(() => {
@@ -1089,12 +1100,12 @@ export default function useGameState() {
     setCaseResults([]);
     setLatestCaseResult(null);
     setPendingCaseResult(null);
-    setActiveKnowledgeCheck(null);
-    activeKnowledgeCheckRef.current = null;
-    setKnowledgeRecords([]);
-    knowledgeRecordsRef.current = [];
-    setKnowledgeCorrect(0);
-    setKnowledgeMistakes(0);
+    setActiveProcedureCheck(null);
+    activeProcedureCheckRef.current = null;
+    setProcedureRecords([]);
+    procedureRecordsRef.current = [];
+    setProcedureCorrect(0);
+    setProcedureMistakes(0);
     setTotalScore(0);
     setScore(0);
     setBadSelections(0);
@@ -1117,12 +1128,8 @@ export default function useGameState() {
     setHexBytes([]);
     setLatestCaseResult(null);
     setPendingCaseResult(null);
-    setActiveKnowledgeCheck(null);
-    activeKnowledgeCheckRef.current = null;
-    setKnowledgeRecords([]);
-    knowledgeRecordsRef.current = [];
-    setKnowledgeCorrect(0);
-    setKnowledgeMistakes(0);
+    setActiveProcedureCheck(null);
+    activeProcedureCheckRef.current = null;
     setScore(0);
     setBadSelections(0);
     setCarveAttempts(0);
@@ -1161,10 +1168,10 @@ export default function useGameState() {
     pendingCaseResult,
     caseResults,
     latestCaseResult,
-    activeKnowledgeCheck,
-    knowledgeRecords,
-    knowledgeCorrect,
-    knowledgeMistakes,
+    activeProcedureCheck,
+    procedureRecords,
+    procedureCorrect,
+    procedureMistakes,
     unlockedOffset,
     goToOffsetTrigger,
     logs,
@@ -1189,11 +1196,12 @@ export default function useGameState() {
     applyXorOp,
     carveData,
     nextLevel,
-    useHint,
+    completeTimelineBoard,
+    useHint: requestHint,
     executeCommand,
     pushLog,
-    answerKnowledgeCheck,
-    dismissKnowledgeCheck,
+    answerProcedureCheck,
+    dismissProcedureCheck,
     resetGame,
     returnToMenu,
 

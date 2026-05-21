@@ -49,6 +49,13 @@ export const CAMPAIGN = [
         body: 'Report full recovery only if the carved artefact is complete and supported by the selected bytes.',
       },
     ],
+    forensicFocus: {
+      label: 'Signature validation and contiguous carving',
+      scope: 'Raw image of the seized negotiator laptop; recover the deleted ransom-chat screenshot from byte-level evidence.',
+      method: 'Use file signatures as leads, validate coherent file boundaries, and carve only the exact byte range supported by the dump.',
+      rationale: 'This maps to magic numbers, data carving, and the forensic rule that a header alone is only a lead, not a defensible recovery.',
+      limitation: 'File-system metadata is treated as unreliable; conclusions depend on raw-byte structure and visual validation.',
+    },
     debrief:
       'The recovered chat log confirms the ransom wallet and gives the task force its first reliable thread: Night Meridian used a document mule to move money after negotiation.',
     forensicConcept: {
@@ -70,29 +77,6 @@ export const CAMPAIGN = [
       'PNG files start with 89 50 4E 47 0D 0A 1A 0A and end with 49 45 4E 44 AE 42 60 82.',
       'A header without a coherent footer is only a lead, not evidence.',
       'Use search 89504E47 to find all occurrences, then verify each one.',
-    ],
-    knowledgeChecks: [
-      {
-        id: 'kc_act1_signature_validation',
-        triggerObjective: 'select_range',
-        title: 'Signature validation',
-        question: 'Why is finding a PNG-looking header not enough to claim a recovered file?',
-        options: [
-          {
-            text: 'Because a defensible carve needs coherent boundaries: header, footer, and an exact byte range.',
-            correct: true,
-          },
-          {
-            text: 'Because the file extension is the only reliable way to identify the true file type.',
-            feedback: 'Extensions are easy to rename. Magic numbers and byte-level validation are more reliable than filenames.',
-          },
-          {
-            text: 'Because every valid PNG contains multiple unrelated headers inside the payload.',
-            feedback: 'Nested byte patterns may occur, but the forensic issue here is boundary validation, not header count.',
-          },
-        ],
-        explanation: 'Correct: magic numbers are leads. A forensic recovery becomes defensible only when the selected range is bounded and coherent.',
-      },
     ],
     maxScore: 150,
     timeBonusThreshold: 240,
@@ -116,7 +100,7 @@ export const CAMPAIGN = [
     caseNote: 'The wallet lead points to a forged identity packet used to open intermediary bank accounts. The file survived deletion, but not contiguously.',
     briefing: [
       'The suspect\'s SSD used TRIM, causing file data to be scattered across non-contiguous disk sectors.',
-      'A scanned image of a forged identity document — used by Night Meridian to open fraudulent bank accounts — was split into two fragments during deletion. The first fragment contains the PNG header, the second contains the footer.',
+      'A scanned image of a forged identity document - used by Night Meridian to open fraudulent bank accounts - was split into two fragments during deletion. The first fragment contains the PNG header, the second contains the footer.',
       'Two filesystem journal remnants survived before the fragments: FR01 and FR02. Each marker is followed by a two-byte fragment length, then the fragment bytes.',
       'Garbage bytes between fragments are unrelated disk residue and must NOT be included in the reconstruction.',
       'Stash both fragments in the Workbench, keep their forensic order, carve the composed stream, then report recovered.',
@@ -143,12 +127,19 @@ export const CAMPAIGN = [
         body: 'Report full recovery only if the reassembled artefact renders correctly and contains no unrelated gap bytes.',
       },
     ],
+    forensicFocus: {
+      label: 'Fragmented recovery from non-contiguous byte runs',
+      scope: 'Raw image containing a deleted forged identity scan split across surviving disk runs.',
+      method: 'Use run descriptors, adjacent length fields, and file boundaries to reconstruct only the bytes that belong to the artefact.',
+      rationale: 'This reinforces fragmentation, unallocated-space residue, and the gap between physical byte position and logical file order.',
+      limitation: 'Bytes between fragments are not assumed to belong to the file and must be excluded unless the evidence map supports them.',
+    },
     debrief:
       'The reconstructed identity scan gives investigators a mule alias. Bank telemetry now ties that alias to a cash-out attempt at a compromised ATM.',
     forensicConcept: {
       title: 'File Fragmentation on Disk',
       paragraphs: [
-        'When a file is saved, the operating system allocates disk clusters. If contiguous clusters are unavailable, the file is split across non-adjacent locations — this is fragmentation.',
+        'When a file is saved, the operating system allocates disk clusters. If contiguous clusters are unavailable, the file is split across non-adjacent locations - this is fragmentation.',
         'After deletion, each fragment may survive independently. A forensic examiner must locate all fragments, determine their correct order, and reconstruct the original file.',
         'Filesystem journals or allocation remnants can sometimes reveal fragment run descriptors. In this case, FR01 and FR02 identify two recovered runs and the length bytes immediately after each marker tell you where the fragment ends.',
         'The cluster gap between fragments often contains unrelated data (garbage). Including these bytes in the reconstruction corrupts the recovered file.',
@@ -168,27 +159,28 @@ export const CAMPAIGN = [
       'Do not include the FR marker, length bytes, or unallocated garbage in the stashed fragments.',
       'You can reorder fragments in the Workbench by dragging them.',
     ],
-    knowledgeChecks: [
+    procedureChecks: [
       {
-        id: 'kc_act2_fragmentation',
-        triggerObjective: 'find_chunk2',
-        title: 'Fragment reconstruction',
-        question: 'Why must the bytes between FR01 and FR02 not be included in the reconstructed file?',
+        id: 'pc_act2_gap_admissibility',
+        trigger: 'post_carve',
+        title: 'Fragment boundary justification',
+        context: 'File-system forensics distinguishes logical file content from physical residue in unallocated areas.',
+        question: 'What makes the reconstructed identity scan defensible after carving?',
         options: [
           {
-            text: 'Because fragmented files may occupy non-adjacent clusters; the gap can be unrelated unallocated residue.',
+            text: 'The selected runs are bounded by descriptors and file structure; unrelated gap bytes were excluded.',
             correct: true,
           },
           {
-            text: 'Because PNG files always require exactly two fragments and no more.',
-            feedback: 'The number of fragments is case-dependent. Here the FR descriptors identify two surviving runs.',
+            text: 'All bytes between the first and second marker were included to preserve physical continuity.',
+            feedback: 'Physical continuity is not the same as logical file membership. Gap bytes may be unrelated residue.',
           },
           {
-            text: 'Because unallocated bytes are automatically encrypted and cannot be evidence.',
-            feedback: 'Unallocated space can contain evidence. The issue is whether those bytes belong to this file.',
+            text: 'The file rendered once, so the exact selected boundaries no longer need to be documented.',
+            feedback: 'Rendering helps validation, but exact offsets and boundaries remain part of the forensic justification.',
           },
         ],
-        explanation: 'Correct: fragmentation separates logical file order from physical adjacency. Including unrelated gap bytes corrupts the artefact.',
+        explanation: 'Correct: the examiner must justify why each selected byte belongs to the recovered file and why the gap does not.',
       },
     ],
     maxScore: 200,
@@ -208,7 +200,7 @@ export const CAMPAIGN = [
     id: 'level_3',
     title: 'ACT 3: Signal and Noise',
     subtitle: 'Multi-signature triage and evidence relevance',
-    difficulty: '???',
+    difficulty: 'multi_sig',
     caseNote: 'The mule alias appears in ATM surveillance metadata. Your dump contains several recoverable artefacts, but only one can place the suspect at the cash-out location.',
     briefing: [
       'An ATM skimming investigation has yielded a disk image from the suspect\'s laptop. Intelligence asks for the artefact that can visually place the mule at the compromised ATM.',
@@ -237,6 +229,13 @@ export const CAMPAIGN = [
         body: 'Do not report an artefact merely because it is recoverable; report the one that supports the investigative question.',
       },
     ],
+    forensicFocus: {
+      label: 'Evidence relevance in multi-signature triage',
+      scope: 'Forensic image with several recoverable artefacts; only one answers the ATM surveillance question.',
+      method: 'Separate technical recoverability from investigative relevance, then validate the selected candidate by its boundaries.',
+      rationale: 'This connects signature-based carving with evidence evaluation: a valid file is not automatically the relevant evidence.',
+      limitation: 'Recoverability alone is insufficient; the report must match the case hypothesis and the artefact must be complete enough to verify.',
+    },
     debrief:
       'The CCTV frame connects the forged identity to a real-world cash-out. The next warrant targets a corporate accountant suspected of laundering the transfer.',
     forensicConcept: {
@@ -260,27 +259,28 @@ export const CAMPAIGN = [
       'JPEG still frames start with FF D8 FF and end with FF D9.',
       'A document signature such as %PDF can be recoverable without answering this case question.',
     ],
-    knowledgeChecks: [
+    procedureChecks: [
       {
-        id: 'kc_act3_relevance',
-        triggerObjective: 'identify_target',
-        title: 'Evidence relevance',
-        question: 'When several valid signatures appear in a dump, what makes one artefact the evidence target?',
+        id: 'pc_act3_evidence_type',
+        trigger: 'post_carve',
+        title: 'Evidence classification',
+        context: 'The recovered artefact is machine-produced but investigator-interpreted. Its meaning depends on the case question.',
+        question: 'How should the recovered ATM surveillance artefact be treated in the report?',
         options: [
           {
-            text: 'It matches the investigative hypothesis and the briefing, and it is technically complete enough to verify.',
+            text: 'As computer-generated visual evidence that still needs contextual interpretation against the case question.',
             correct: true,
           },
           {
-            text: 'It appears at the lowest byte offset, because earlier files are always more reliable.',
-            feedback: 'Offset order does not establish evidentiary relevance. It only tells you where bytes appear in this dump.',
+            text: 'As a human confession, because the image visually identifies the suspect.',
+            feedback: 'A surveillance image is not a confession. It must be interpreted and correlated with the investigation.',
           },
           {
-            text: 'It belongs to the most common file type, because common formats are easier to defend in court.',
-            feedback: 'Ease of carving is not relevance. The examiner must connect the artefact to the case question.',
+            text: 'As irrelevant once a valid PDF is also recoverable from the same dump.',
+            feedback: 'A valid artefact can be irrelevant. The target is the artefact that answers the surveillance question.',
           },
         ],
-        explanation: 'Correct: not every recoverable file is relevant. Forensic work links artefacts to the case theory and validates their technical integrity.',
+        explanation: 'Correct: technical recovery and evidential meaning are separate. The artefact must be linked to the investigation hypothesis.',
       },
     ],
     maxScore: 200,
@@ -330,6 +330,13 @@ export const CAMPAIGN = [
         body: 'Only after unlocking should you perform normal carving and report full recovery if the resulting image is complete.',
       },
     ],
+    forensicFocus: {
+      label: 'Partition-aware acquisition reasoning',
+      scope: 'Forensic image where the target evidence lies behind an MBR partition mapping step.',
+      method: 'Read the MBR partition entry, decode the Little-Endian LBA, convert it into a byte offset, and unlock the correct sector range.',
+      rationale: 'This ties MBR structure, partition tables, Little-Endian encoding, and logical-to-physical offset calculation into one workflow.',
+      limitation: 'Pattern search is deliberately scoped to readable sectors until the partition offset is justified.',
+    },
     debrief:
       'The bank transfer screenshot closes the money trail. Agent Root now pivots from laundering to attribution: recover the ransomware configuration itself.',
     forensicConcept: {
@@ -360,27 +367,29 @@ export const CAMPAIGN = [
       'The sector size is 32 bytes. Multiply the LBA start by 32 to get the byte offset.',
       'After calculating, use: go <offset> in the terminal to unlock.',
     ],
-    knowledgeChecks: [
+    procedureChecks: [
       {
-        id: 'kc_act4_lba_offset',
-        triggerObjective: 'calculate_offset',
-        title: 'MBR offset reasoning',
-        question: 'How do you derive the byte offset of the hidden partition from the MBR entry?',
+        id: 'pc_act4_untrusted_view',
+        trigger: 'objective',
+        triggerObjective: 'unlock_sector',
+        title: 'Raw view over OS view',
+        context: 'The visible view is incomplete. The partition table is the only reliable map to the hidden sector range.',
+        question: 'Why was the partition offset calculation required before searching for the PNG?',
         options: [
           {
-            text: 'Read bytes 8-11 as a Little-Endian LBA value, then multiply that value by the sector size.',
+            text: 'Because the readable view was intentionally limited; the MBR partition entry justified where the hidden data area begins.',
             correct: true,
           },
           {
-            text: 'Add 0x1BE to the four LBA bytes and use the result as the final byte offset.',
-            feedback: '0x1BE locates the partition table. The LBA field must be decoded, then multiplied by sector size.',
+            text: 'Because PNG signatures are legally invalid unless they are found by the operating system file browser.',
+            feedback: 'The file browser view is not the authority here. The raw partition structure explains where the evidence area begins.',
           },
           {
-            text: 'Search for the PNG header and ignore the partition table once any match is found.',
-            feedback: 'The partition table is the evidence map for this act. Ignoring it defeats the intended forensic reasoning.',
+            text: 'Because Little-Endian values are encryption keys and must be decrypted before any search.',
+            feedback: 'Little-Endian is byte order, not encryption. It must be decoded into an LBA and then a byte offset.',
           },
         ],
-        explanation: 'Correct: the MBR stores partition start as an LBA, and LBA values become byte offsets only after multiplication by sector size.',
+        explanation: 'Correct: this level forces partition-aware reasoning before normal carving, mirroring low-level file-system forensics.',
       },
     ],
     maxScore: 300,
@@ -444,6 +453,13 @@ export const CAMPAIGN = [
         body: 'Because the tail is overwritten, the correct conclusion must acknowledge partial recovery rather than overclaiming a complete artefact.',
       },
     ],
+    forensicFocus: {
+      label: 'Partial recovery and weak obfuscation',
+      scope: 'Deleted malware-loader artefact with an overwritten tail and a surviving XOR-obfuscated fragment.',
+      method: 'Use marker triage, known-plaintext XOR reasoning, and coherence checks to decode only the surviving payload bytes.',
+      rationale: 'This links anti-forensics, weak obfuscation, known-plaintext analysis, and calibrated forensic reporting.',
+      limitation: 'The original artefact is incomplete; the correct conclusion must be partial even if the surviving fragment is readable.',
+    },
     debrief:
       'The partial payload is enough to identify the ransomware branch, but not enough to overclaim. The final dump may still contain the credentials used for exfiltration.',
     forensicConcept: {
@@ -453,7 +469,7 @@ export const CAMPAIGN = [
         'Real malware often stores compact cleartext markers before encoded payloads so its loader can find the right block at runtime. Here, NMPL marks the Night Meridian payload candidate and NXPL marks a decoy candidate.',
         'If you know even one byte of the original plaintext, you can derive the key: key = ciphertext_byte ⊕ known_plaintext_byte. This is called a known-plaintext attack.',
         'Entropy analysis is a secondary triage method: encoded text can have a different byte distribution from random filler, so anomalous blocks deserve closer inspection.',
-        'Partial recovery occurs when part of the original data has been overwritten by new data. The forensic conclusion must accurately reflect that the recovery is incomplete — overclaiming undermines the entire investigation.',
+        'Partial recovery occurs when part of the original data has been overwritten by new data. The forensic conclusion must accurately reflect that the recovery is incomplete - overclaiming undermines the entire investigation.',
       ],
       keySignatures: ['NMPL', 'NXPL'],
     },
@@ -473,27 +489,28 @@ export const CAMPAIGN = [
       'A missing tail means the correct conclusion is partial, not recovered.',
       'The report matters here as much as the byte selection.',
     ],
-    knowledgeChecks: [
+    procedureChecks: [
       {
-        id: 'kc_act5_partial_reporting',
-        triggerObjective: 'declare_limit',
-        title: 'Calibrated reporting',
-        question: 'Why is "partial" the defensible report here even after the readable payload has been carved?',
+        id: 'pc_act5_antiforensics',
+        trigger: 'post_carve',
+        title: 'Anti-forensics diagnosis',
+        context: 'The loader artefact contains both concealment and misdirection. The recovered bytes are useful, but not complete.',
+        question: 'Which combination best describes what you encountered in this artefact?',
         options: [
           {
-            text: 'Because overwritten bytes create a known limitation, so the conclusion must not claim full recovery.',
+            text: 'Weak obfuscation, a planted decoy, and overwritten data causing partial recovery.',
             correct: true,
           },
           {
-            text: 'Because XOR decryption always makes evidence legally weaker, even when the key is derived correctly.',
-            feedback: 'XOR itself is not the reason. The limitation is the overwritten tail and incomplete artefact.',
+            text: 'Only file fragmentation, because XOR does not affect forensic interpretation.',
+            feedback: 'XOR is an obfuscation technique and the decoy is a deliberate false lead.',
           },
           {
-            text: 'Because text artefacts can never be reported as fully recovered in digital forensics.',
-            feedback: 'Text artefacts can be fully recovered. The report depends on completeness and validation.',
+            text: 'A complete encrypted file, so the final report should claim full recovery after decoding.',
+            feedback: 'The tail is overwritten. Decoding the surviving bytes does not make the original artefact complete.',
           },
         ],
-        explanation: 'Correct: forensic reporting must declare scope and limits. A partial recovery can still be valuable, but overclaiming damages credibility.',
+        explanation: 'Correct: the defensible finding names both the anti-forensic techniques and the recovery limitation.',
       },
     ],
     maxScore: 300,
@@ -505,7 +522,7 @@ export const CAMPAIGN = [
     nudges: [
       { objectiveId: 'find_partial', delaySeconds: 45, message: 'Search for marker 4E4D (NM) and 4E58 (NX). Each marked candidate starts 4 bytes after the marker; NMPL is the likely loader payload, NXPL is suspicious.' },
       { objectiveId: 'find_key', delaySeconds: 90, message: 'Use xorhex in the terminal: XOR the first encrypted byte after each marker with 52 (ASCII "R") to derive and compare candidate keys.' },
-      { objectiveId: 'report_partial', delaySeconds: 150, message: 'The file was partially overwritten — the correct conclusion is report partial, not recovered. Forensic integrity matters!' },
+      { objectiveId: 'report_partial', delaySeconds: 150, message: 'The file was partially overwritten - the correct conclusion is report partial, not recovered. Forensic integrity matters!' },
     ],
   },
 
@@ -545,6 +562,13 @@ export const CAMPAIGN = [
         body: 'Report full recovery only if all genuine fragments are present, ordered, decrypted, and readable as one payload.',
       },
     ],
+    forensicFocus: {
+      label: 'Multi-fragment incident evidence correlation',
+      scope: 'Staging-server dump containing credential fragments, decoys, and weak XOR protection.',
+      method: 'Identify genuine records, use length fields to bound each fragment, derive the XOR key, and validate the ordered decrypted payload.',
+      rationale: 'This combines fragmented recovery, decoy rejection, obfuscation handling, and incident-response relevance.',
+      limitation: 'All genuine fragments must be present, ordered, decrypted, and coherent before claiming full recovery.',
+    },
     debrief:
       'The recovered credentials confirm exfiltration and give incident command the account list needed for containment, victim notification, and prosecution.',
     forensicConcept: {
@@ -553,7 +577,7 @@ export const CAMPAIGN = [
         'In a real ransomware investigation, exfiltrated data is often fragmented across multiple locations. The attacker may use weak encryption to hinder casual recovery while keeping the data accessible to their own tools.',
         'Staging tools often need small cleartext record tags so they can reassemble chunks later. Here, EX01, EX02, and EX03 identify ordered exfiltration records; EXD0 is a planted decoy record.',
         'Each staging record follows a compact structure: a 4-byte cleartext tag, one length byte, then exactly that many XOR-encoded payload bytes. The length byte defines where the fragment ends.',
-        'Forensic triage requires distinguishing between genuine evidence fragments, anti-forensics decoys, and unrelated data. Each stashed fragment affects your evidence chain — false inclusions weaken the case.',
+        'Forensic triage requires distinguishing between genuine evidence fragments, anti-forensics decoys, and unrelated data. Each stashed fragment affects your evidence chain - false inclusions weaken the case.',
         'When multiple fragments exist, their reconstruction order matters. An incorrect sequence produces corrupted output even if the individual fragments are correct.',
       ],
       keySignatures: ['EX01', 'EX02', 'EX03', 'EXD0'],
@@ -571,31 +595,32 @@ export const CAMPAIGN = [
       'Search for staging records: EX01 = 45 58 30 31, EX02 = 45 58 30 32, EX03 = 45 58 30 33.',
       'The byte immediately after each EX record is the fragment length. Stash the encrypted bytes after that length byte.',
       'ASCII "E" = 0x45. XOR the first byte after EX01 with 0x45 to derive the key.',
-      'EXD0 is a decoy credential block using a different XOR key (0x3C) — it will produce garbage with the real key.',
+      'EXD0 is a decoy credential block using a different XOR key (0x3C) - it will produce garbage with the real key.',
       'Fragment order follows the record IDs: EX01, EX02, EX03.',
       'After stashing all 3 fragments in order, apply XOR in the Workbench, then Compose & Carve.',
     ],
-    knowledgeChecks: [
+    procedureChecks: [
       {
-        id: 'kc_act6_xor_triage',
-        triggerObjective: 'find_key',
-        title: 'XOR triage',
-        question: 'After deriving a candidate XOR key, what still has to be validated before carving?',
+        id: 'pc_act6_timeline',
+        trigger: 'post_carve',
+        title: 'Incident timeline correlation',
+        context: 'The final evidence must read as a sequence of incident events, not as six disconnected recoveries.',
+        question: 'Which event sequence best supports the final report?',
         options: [
           {
-            text: 'The key must decode the ordered genuine fragments coherently, while decoys remain inconsistent or wrong-key.',
+            text: 'Ransom negotiation -> forged identity -> ATM cash-out -> fraudulent transfer -> payload attribution -> exfiltrated credentials.',
             correct: true,
           },
           {
-            text: 'The key is enough by itself; if one byte matches known plaintext, all records can be trusted automatically.',
-            feedback: 'Known plaintext gives a candidate key, not a complete proof. The decoded stream still needs coherence checks.',
+            text: 'Exfiltrated credentials -> forged identity -> ransom negotiation -> ATM cash-out -> payload attribution.',
+            feedback: 'The recovered evidence chain should follow the investigative story built across the acts, not just the final artefact.',
           },
           {
-            text: 'Only the last fragment matters, because footers are more important than headers in XOR recovery.',
-            feedback: 'All fragments and their order matter. A wrong middle fragment can corrupt the whole payload.',
+            text: 'ATM cash-out -> payload attribution -> ransom negotiation -> forged identity -> transfer.',
+            feedback: 'This sequence breaks the money trail and attribution logic established by the recovered artefacts.',
           },
         ],
-        explanation: 'Correct: the known-plaintext key is a starting point. The examiner must validate fragment order, coherence, and decoy rejection.',
+        explanation: 'Correct: the final report is not just a list of files; it correlates artefacts into a defensible incident chain.',
       },
     ],
     maxScore: 350,
@@ -613,20 +638,20 @@ export const CAMPAIGN = [
 
 // Signatures forensi note per reference in-game
 export const KNOWN_SIGNATURES = {
-  png:  { header: '89504E47', footer: '49454E44AE426082', name: 'PNG Image',     description: 'Portable Network Graphics — lossless image format' },
-  pdf:  { header: '25504446', footer: '2525454F46',       name: 'PDF Document',  description: 'Portable Document Format — page layout document' },
-  jpg:  { header: 'FFD8FF',   footer: 'FFD9',             name: 'JPEG Image',    description: 'Joint Photographic Experts Group — lossy image format' },
-  zip:  { header: '504B0304', footer: '504B0506',         name: 'ZIP Archive',   description: 'PKZip compressed archive format' },
-  gif:  { header: '47494638', footer: '003B',             name: 'GIF Image',     description: 'Graphics Interchange Format — animated image' },
-  docx: { header: '504B0304', footer: '504B0506',         name: 'DOCX (Office)', description: 'Microsoft Office Open XML — same ZIP container' },
-  exe:  { header: '4D5A',     footer: '',                 name: 'PE Executable', description: 'Windows Portable Executable binary' },
-  elf:  { header: '7F454C46', footer: '',                 name: 'ELF Binary',    description: 'Linux Executable and Linkable Format' },
-  nmpl: { header: '4E4D504C', footer: '',                 name: 'NMPL Marker',   description: 'Night Meridian loader payload marker' },
-  nxpl: { header: '4E58504C', footer: '',                 name: 'NXPL Marker',   description: 'Night Meridian decoy candidate marker' },
-  fr01: { header: '46523031', footer: '',                 name: 'FR01 Run',      description: 'Recovered fragment run descriptor #1' },
-  fr02: { header: '46523032', footer: '',                 name: 'FR02 Run',      description: 'Recovered fragment run descriptor #2' },
-  ex01: { header: '45583031', footer: '',                 name: 'EX01 Record',   description: 'Exfiltration staging record #1' },
-  ex02: { header: '45583032', footer: '',                 name: 'EX02 Record',   description: 'Exfiltration staging record #2' },
-  ex03: { header: '45583033', footer: '',                 name: 'EX03 Record',   description: 'Exfiltration staging record #3' },
-  exd0: { header: '45584430', footer: '',                 name: 'EXD0 Decoy',    description: 'Wrong-key exfiltration decoy record' },
+  png: { header: '89504E47', footer: '49454E44AE426082', name: 'PNG Image', description: 'Portable Network Graphics - lossless image format' },
+  pdf: { header: '25504446', footer: '2525454F46', name: 'PDF Document', description: 'Portable Document Format - page layout document' },
+  jpg: { header: 'FFD8FF', footer: 'FFD9', name: 'JPEG Image', description: 'Joint Photographic Experts Group - lossy image format' },
+  zip: { header: '504B0304', footer: '504B0506', name: 'ZIP Archive', description: 'PKZip compressed archive format' },
+  gif: { header: '47494638', footer: '003B', name: 'GIF Image', description: 'Graphics Interchange Format - animated image' },
+  docx: { header: '504B0304', footer: '504B0506', name: 'DOCX (Office)', description: 'Microsoft Office Open XML - same ZIP container' },
+  exe: { header: '4D5A', footer: '', name: 'PE Executable', description: 'Windows Portable Executable binary' },
+  elf: { header: '7F454C46', footer: '', name: 'ELF Binary', description: 'Linux Executable and Linkable Format' },
+  nmpl: { header: '4E4D504C', footer: '', name: 'NMPL Marker', description: 'Night Meridian loader payload marker' },
+  nxpl: { header: '4E58504C', footer: '', name: 'NXPL Marker', description: 'Night Meridian decoy candidate marker' },
+  fr01: { header: '46523031', footer: '', name: 'FR01 Run', description: 'Recovered fragment run descriptor #1' },
+  fr02: { header: '46523032', footer: '', name: 'FR02 Run', description: 'Recovered fragment run descriptor #2' },
+  ex01: { header: '45583031', footer: '', name: 'EX01 Record', description: 'Exfiltration staging record #1' },
+  ex02: { header: '45583032', footer: '', name: 'EX02 Record', description: 'Exfiltration staging record #2' },
+  ex03: { header: '45583033', footer: '', name: 'EX03 Record', description: 'Exfiltration staging record #3' },
+  exd0: { header: '45584430', footer: '', name: 'EXD0 Decoy', description: 'Wrong-key exfiltration decoy record' },
 };

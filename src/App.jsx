@@ -16,7 +16,9 @@ import ScoreBoard from './components/ScoreBoard';
 import SignatureReference from './components/SignatureReference';
 import InvestigationTimeline from './components/InvestigationTimeline';
 import ObjectiveToast from './components/ObjectiveToast';
-import KnowledgeCheck from './components/KnowledgeCheck';
+import ForensicProcedureCheck from './components/ForensicProcedureCheck';
+import EvidenceIntake from './components/EvidenceIntake';
+import CaseTimelineBoard from './components/CaseTimelineBoard';
 
 export default function App() {
   const game = useGameState();
@@ -24,6 +26,8 @@ export default function App() {
   const [showBoot, setShowBoot] = useState(true);
   const [showIntro, setShowIntro] = useState(true);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showEvidenceIntake, setShowEvidenceIntake] = useState(false);
+  const [intakeCompleted, setIntakeCompleted] = useState(false);
   const [reviewBriefingOpen, setReviewBriefingOpen] = useState(false);
   const [tutorialSeen, setTutorialSeen] = useState(() => {
     try { return localStorage.getItem('shattered_bytes_tutorial_seen') === '1'; } catch { return false; }
@@ -32,6 +36,16 @@ export default function App() {
   const handleBootComplete = useCallback(() => {
     setShowBoot(false);
   }, []);
+
+  const loadLevelWithPreparation = useCallback((levelIdx) => {
+    if (levelIdx === 0 && !intakeCompleted && !game.completedLevels.includes(0)) {
+      window.__pendingLevel = levelIdx;
+      setShowEvidenceIntake(true);
+      return;
+    }
+
+    game.loadLevel(levelIdx);
+  }, [game, intakeCompleted]);
 
   const handleStartGame = useCallback(() => {
     const nextLevelIdx = game.completedLevels.length > 0 ? Math.min(game.completedLevels.length, CAMPAIGN.length - 1) : 0;
@@ -42,9 +56,9 @@ export default function App() {
       // Store the level to load after tutorial
       window.__pendingLevel = nextLevelIdx;
     } else {
-      game.loadLevel(nextLevelIdx);
+      loadLevelWithPreparation(nextLevelIdx);
     }
-  }, [game, tutorialSeen, CAMPAIGN.length]);
+  }, [game, tutorialSeen, CAMPAIGN.length, loadLevelWithPreparation]);
 
 
 
@@ -62,9 +76,17 @@ export default function App() {
     const pendingLevel = window.__pendingLevel;
     delete window.__pendingLevel;
     if (pendingLevel !== null && pendingLevel !== undefined) {
-      game.loadLevel(pendingLevel);
+      loadLevelWithPreparation(pendingLevel);
     }
     // else: stay on menu
+  }, [loadLevelWithPreparation]);
+
+  const handleEvidenceIntakeComplete = useCallback(() => {
+    setShowEvidenceIntake(false);
+    setIntakeCompleted(true);
+    const pendingLevel = window.__pendingLevel ?? 0;
+    delete window.__pendingLevel;
+    game.loadLevel(pendingLevel);
   }, [game]);
 
   const handleIntroComplete = useCallback(() => {
@@ -76,8 +98,8 @@ export default function App() {
       setReviewBriefingOpen(true);
       return;
     }
-    game.loadLevel(idx);
-  }, [game]);
+    loadLevelWithPreparation(idx);
+  }, [game, loadLevelWithPreparation]);
 
   // --- Boot Sequence ---
   if (showBoot) {
@@ -94,6 +116,10 @@ export default function App() {
     return <Tutorial onComplete={handleTutorialCompleteToMenu} />;
   }
 
+  if (showEvidenceIntake) {
+    return <EvidenceIntake onComplete={handleEvidenceIntakeComplete} />;
+  }
+
   // --- Main Menu ---
   if (game.phase === GAME_PHASE.MENU) {
     return (
@@ -104,6 +130,10 @@ export default function App() {
         totalScore={game.totalScore}
       />
     );
+  }
+
+  if (game.phase === GAME_PHASE.TIMELINE_BOARD) {
+    return <CaseTimelineBoard onComplete={game.completeTimelineBoard} />;
   }
 
   // --- Briefing overlay ---
@@ -129,10 +159,10 @@ export default function App() {
       {/* Objective toast notifications */}
       <ObjectiveToast objectives={game.objectives} />
 
-      <KnowledgeCheck
-        check={game.activeKnowledgeCheck}
-        onAnswer={game.answerKnowledgeCheck}
-        onContinue={game.dismissKnowledgeCheck}
+      <ForensicProcedureCheck
+        check={game.activeProcedureCheck}
+        onAnswer={game.answerProcedureCheck}
+        onContinue={game.dismissProcedureCheck}
       />
 
       {/* Score / Victory / Campaign end overlays */}

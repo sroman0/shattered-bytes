@@ -53,7 +53,7 @@ export default function Workbench({ chunks, onRemove, onMove, onCarve, onXor, le
         <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
           {chunks.length === 0 && (
             <p className="text-[10px] text-gray-600 italic text-center py-3">
-              Select bytes in the Hex Editor and click "Stash" to add fragments here.
+              Select bytes in the Hex Editor and click &quot;Stash&quot; to add fragments here.
             </p>
           )}
           {chunks.map((chunk, i) => {

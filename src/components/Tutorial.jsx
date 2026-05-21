@@ -11,7 +11,7 @@ const TUTORIAL_STEPS = [
     title: 'The Hex Editor',
     icon: '📊',
     content: 'The center panel displays the raw bytes of the forensic image. Each row shows 16 bytes with their hex values and ASCII interpretation. Use the page navigation arrows to browse the dump.',
-    tip: 'File signatures appear as recognizable hex patterns — learn to spot them!',
+    tip: 'File signatures appear as recognizable hex patterns - learn to spot them!',
   },
   {
     title: 'Selecting & Stashing Bytes',
@@ -35,7 +35,7 @@ const TUTORIAL_STEPS = [
     title: 'Submitting Your Report',
     icon: '📋',
     content: 'After a successful carve, submit your forensic conclusion via the terminal: "report recovered" for full recovery, or "report partial" for incomplete evidence.',
-    tip: 'Overclaiming evidence undermines forensic integrity — choose accurately.',
+    tip: 'Overclaiming evidence undermines forensic integrity - choose accurately.',
   },
   {
     title: 'Scoring & Objectives',
@@ -58,9 +58,8 @@ export default function Tutorial({ onComplete }) {
         {/* Progress dots */}
         <div className="flex justify-center gap-2 mb-5">
           {TUTORIAL_STEPS.map((_, i) => (
-            <div key={i} className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
-              i === step ? 'bg-cyan-400 scale-125' : i < step ? 'bg-cyan-700' : 'bg-gray-700'
-            }`} />
+            <div key={i} className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${i === step ? 'bg-cyan-400 scale-125' : i < step ? 'bg-cyan-700' : 'bg-gray-700'
+              }`} />
           ))}
         </div>
 

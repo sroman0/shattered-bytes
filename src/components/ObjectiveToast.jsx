@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 
 /**
- * ObjectiveToast — shows a brief animated notification when an objective is completed.
+ * ObjectiveToast - shows a brief animated notification when an objective is completed.
  * Monitors the objectives array and detects transitions from incomplete → completed.
  */
 export default function ObjectiveToast({ objectives }) {

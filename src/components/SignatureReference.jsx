@@ -40,10 +40,10 @@ export default function SignatureReference() {
                 </div>
                 <div className="grid grid-cols-[50px_1fr] gap-1 text-gray-400 font-mono">
                   <span className="text-gray-600">HDR</span>
-                  <span className="text-green-400/80 select-all">{sig.header || '—'}</span>
+                  <span className="text-green-400/80 select-all">{sig.header || '-'}</span>
                   {/* TODO: choose if to display footer */}
                   <span className="text-gray-600">FTR</span>
-                  <span className="text-red-400/60 select-all">{sig.footer || '—'}</span>
+                  <span className="text-red-400/60 select-all">{sig.footer || '-'}</span>
                 </div>
                 {sig.description && (
                   <div className="text-gray-600 mt-1 leading-snug">{sig.description}</div>

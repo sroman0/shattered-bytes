@@ -1,14 +1,8 @@
 # Dependencies
 node_modules/
 
-# Build output
-dist/
-
 # Local/context files
 GEMINI.md
-
-# Solution guides
-docs/WALKTHROUGH.md
 
 # Temporary/generated files
 tmp/
@@ -27,4 +21,5 @@ __pycache__/
 *.fls
 *.fdb_latexmk
 docs/presentation/out/
+docs/WALKTHROUGH.md
 docs/STUDY_GUIDE_THEORY.md

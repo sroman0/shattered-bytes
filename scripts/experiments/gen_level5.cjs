@@ -67,7 +67,7 @@ const level5 = {
       {
         start: DECOY_OFFSET,
         end: DECOY_OFFSET + DECOY_PLAINTEXT.length - 1,
-        reason: "NXPL-marked XOR candidate with different key — not the target payload"
+        reason: "NXPL-marked XOR candidate with different key - not the target payload"
       }
     ]
   },

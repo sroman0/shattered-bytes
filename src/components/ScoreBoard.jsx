@@ -52,11 +52,11 @@ export default function ScoreBoard({
       acc.carveAttempts += r.carveAttempts;
       acc.hintsUsed += r.hintsUsed;
       acc.elapsedTime += r.elapsedTime;
-      acc.knowledgeCorrect += r.knowledgeCorrect || 0;
-      acc.knowledgeMistakes += r.knowledgeMistakes || 0;
-      acc.knowledgeCheckCount += r.knowledgeCheckCount || 0;
+      acc.procedureCorrect += r.procedureCorrect || 0;
+      acc.procedureMistakes += r.procedureMistakes || 0;
+      acc.procedureCheckCount += r.procedureCheckCount || 0;
       return acc;
-    }, { badSelections: 0, carveAttempts: 0, hintsUsed: 0, elapsedTime: 0, knowledgeCorrect: 0, knowledgeMistakes: 0, knowledgeCheckCount: 0 });
+    }, { badSelections: 0, carveAttempts: 0, hintsUsed: 0, elapsedTime: 0, procedureCorrect: 0, procedureMistakes: 0, procedureCheckCount: 0 });
     const partialHandled = caseResults.some(r => r.report === 'partial');
     const maxTotal = caseResults.reduce((sum, r) => sum + r.maxScore, 0);
     const masteryRatio = maxTotal > 0 ? totalScore / maxTotal : 0;
@@ -85,6 +85,16 @@ export default function ScoreBoard({
             <p className="text-xs text-gray-400 mt-1 leading-relaxed">{mastery.note}</p>
           </div>
 
+          <div className="bg-gray-950/50 border border-emerald-900/40 rounded-lg p-3 mb-3">
+            <div className="text-[10px] text-emerald-500 uppercase tracking-wider font-bold">Forensic Report Summary</div>
+            <div className="mt-2 space-y-1.5 text-xs text-gray-400 leading-relaxed">
+              <p><span className="text-gray-200 font-bold">Scope:</span> six read-only lab evidence images examined through byte-level recovery tasks.</p>
+              <p><span className="text-gray-200 font-bold">Method:</span> signature validation, fragment reconstruction, MBR offset reasoning, XOR deobfuscation, decoy rejection, and calibrated reporting.</p>
+              <p><span className="text-gray-200 font-bold">Limitations:</span> conclusions are bounded by the recovered bytes; the overwritten malware payload is reported as partial instead of overclaimed.</p>
+              <p><span className="text-gray-200 font-bold">Conclusion:</span> {STORY.finalReport}</p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-2 mb-3">
             {[
               ['Signature recognition', rate(totals.badSelections, 0, 2)],
@@ -92,7 +102,7 @@ export default function ScoreBoard({
               ['Fragment reconstruction', caseResults.some(r => r.title.includes('Fracture')) ? 'High' : 'Medium'],
               ['Trial-and-error discipline', rate(totals.badSelections + extraCarves, 0, 2)],
               ['Obfuscation handling', caseResults.some(r => r.obfuscationHandled) ? 'High' : 'Medium'],
-              ['Concept assimilation', totals.knowledgeMistakes === 0 ? 'High' : totals.knowledgeMistakes <= 2 ? 'Medium' : 'Low'],
+              ['Procedure discipline', totals.procedureMistakes === 0 ? 'High' : totals.procedureMistakes <= 2 ? 'Medium' : 'Low'],
               ['Forensic reasoning', partialHandled ? 'High' : 'Medium'],
               ['Reporting quality', caseResults.every(r => ['recovered', 'partial'].includes(r.report)) ? 'High' : 'Medium'],
             ].map(([label, value]) => (
@@ -107,11 +117,22 @@ export default function ScoreBoard({
 
           <div className="space-y-1 mb-4">
             {caseResults.map(r => (
-              <div key={r.levelId} className="flex justify-between gap-3 text-xs bg-gray-950/40 border border-gray-800 rounded px-3 py-1.5">
-                <span className="text-gray-300 truncate">{r.title}</span>
-                <span className="text-gray-500 shrink-0">
-                  {r.report} | {r.score}/{r.maxScore} | KC {r.knowledgeCorrect || 0}/{r.knowledgeCheckCount || 0} | {formatTime(r.elapsedTime)}
-                </span>
+              <div key={r.levelId} className="bg-gray-950/40 border border-gray-800 rounded px-3 py-1.5 text-xs">
+                <div className="flex justify-between gap-3">
+                  <span className="text-gray-300 truncate">{r.title}</span>
+                  <span className="text-gray-500 shrink-0">
+                    {r.report} | {r.score}/{r.maxScore} | {formatTime(r.elapsedTime)}
+                  </span>
+                </div>
+                {r.procedureCheckCount > 0 && (
+                  <div className="text-[10px] text-cyan-500/80 mt-0.5 truncate">
+                    Procedure {r.procedureCorrect || 0}/{r.procedureCheckCount}
+                    {(r.procedureMistakes || 0) > 0 ? ` | ${r.procedureMistakes} risk(s)` : ''}
+                  </div>
+                )}
+                {r.forensicFocus && (
+                  <div className="text-[10px] text-emerald-500/80 mt-0.5 truncate">{r.forensicFocus}</div>
+                )}
               </div>
             ))}
           </div>
@@ -156,6 +177,18 @@ export default function ScoreBoard({
           </div>
         )}
 
+        {currentLevel.forensicFocus && (
+          <div className="bg-emerald-950/15 border border-emerald-900/40 rounded-lg px-3.5 py-3 mb-5">
+            <div className="text-[9px] text-emerald-500 uppercase tracking-[0.22em] mb-1 font-bold">Forensic Debrief</div>
+            <p className="text-xs text-gray-300 leading-relaxed mb-1.5">
+              <span className="text-emerald-300 font-bold">Method:</span> {currentLevel.forensicFocus.method}
+            </p>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              <span className="text-amber-300 font-bold">Limit:</span> {currentLevel.forensicFocus.limitation}
+            </p>
+          </div>
+        )}
+
         <div className="grid grid-cols-3 gap-3 mb-5">
           <div className="bg-gray-800/50 rounded-lg p-3 text-center border border-gray-700/30">
             <div className="text-xl font-bold text-yellow-400 tabular-nums">{score}</div>
@@ -173,10 +206,10 @@ export default function ScoreBoard({
 
         {latestCaseResult && (
           <div className="bg-amber-950/20 border border-amber-800/40 rounded-lg px-3.5 py-3 mb-5">
-            <div className="text-[9px] text-amber-500 uppercase tracking-[0.22em] mb-1 font-bold">Concept Assimilation</div>
+            <div className="text-[9px] text-amber-500 uppercase tracking-[0.22em] mb-1 font-bold">Procedure Discipline</div>
             <p className="text-xs text-gray-300 leading-relaxed">
-              Knowledge checks passed: <span className="text-amber-300 font-bold">{latestCaseResult.knowledgeCorrect || 0}/{latestCaseResult.knowledgeCheckCount || 0}</span>
-              {' '}with <span className={latestCaseResult.knowledgeMistakes ? 'text-red-300 font-bold' : 'text-green-300 font-bold'}>{latestCaseResult.knowledgeMistakes || 0}</span> retry penalty.
+              Evidence decisions passed: <span className="text-cyan-300 font-bold">{latestCaseResult.procedureCorrect || 0}/{latestCaseResult.procedureCheckCount || 0}</span>
+              {' '}with <span className={latestCaseResult.procedureMistakes ? 'text-red-300 font-bold' : 'text-green-300 font-bold'}>{latestCaseResult.procedureMistakes || 0}</span> procedure risk(s).
             </p>
           </div>
         )}

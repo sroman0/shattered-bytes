@@ -33,8 +33,6 @@
 \subtitle{A Manual Data Carving Serious Game for Computer Forensics Education}
 \author{Simone Romano}
 \institute{Computer Forensics and Cyber Crime Analysis}
-\date{\today}
-
 \begin{document}
 
 % 1
@@ -56,8 +54,10 @@
       and \textbf{fragment reconstruction}.
     \item The campaign avoids a pure ``find the header'' exercise by adding decoys,
       partial recovery, XOR obfuscation, and partition-based navigation.
-    \item The final output is both the recovered evidence and a \textbf{competency report}
-      on the player's investigative method.
+    \item Recent gameplay additions include a drag-and-drop \textbf{evidence intake}
+      sequence and a final \textbf{incident timeline board}.
+    \item The final output is both the recovered evidence and a transparent
+      \textbf{competency report} on the player's investigative method.
   \end{itemize}
 \end{frame}
 
@@ -103,6 +103,8 @@
 % 5
 \begin{frame}{Core Gameplay Loop}
   \begin{enumerate}
+    \item \textbf{Prepare} the evidence workflow: sealed drive, write blocker,
+      forensic workstation, hash verification.
     \item \textbf{Identify} the forensic target from the mission briefing.
     \item \textbf{Inspect} the dump with \texttt{search}, \texttt{go}, \texttt{select}, and \texttt{info}.
     \item \textbf{Stash} exact byte ranges in the workbench.
@@ -143,35 +145,31 @@
     \item \textbf{Terminal}: forensic commands such as \texttt{search}, \texttt{go},
       \texttt{select}, \texttt{entropy}, \texttt{xorcalc}, \texttt{xor}, and \texttt{report}.
     \item \textbf{Workbench}: fragment storage, ordering, XOR transformation, carving.
-    \item \textbf{Evidence Journal}: selected ranges, bad leads, carving attempts.
     \item \textbf{Asset Viewer}: visual/text verification of recovered evidence.
+    \item \textbf{Evidence Intake}: drag-and-drop acquisition procedure before Act 1.
+    \item \textbf{Timeline Board}: final drag-and-drop correlation of all recovered artefacts.
     \item \textbf{Objectives Panel}: explicit investigation goals and manual hints.
   \end{itemize}
 \end{frame}
 
 % 8
 \begin{frame}{Assessment Model}
-  \begin{columns}[T,onlytextwidth]
-    \begin{column}{0.49\textwidth}
-      \begin{block}{Scoring signals}
-        \begin{itemize}
-          \item \textbf{exact byte ranges};
-          \item \textbf{false positives} and overlaps;
-          \item extra carving attempts;
-          \item hint usage;
-          \item elapsed time;
-          \item \textbf{report correctness}.
-        \end{itemize}
-      \end{block}
-    \end{column}
-    \begin{column}{0.49\textwidth}
-      \begin{block}{Final report}
-        The game summarizes mastery across signature recognition, offset precision,
-        fragment reconstruction, trial-and-error discipline, obfuscation handling,
-        \textbf{forensic reasoning}, and reporting quality.
-      \end{block}
-    \end{column}
-  \end{columns}
+  \begin{block}{Score formula}
+    \small
+    \texttt{score = maxScore - 15*hints - 25*badSelections - 30*extraCarves
+    - 40*wrongReports - 15*procedureMistakes + timeBonus}
+  \end{block}
+
+  \vspace{0.15cm}
+  \begin{itemize}
+    \item \textbf{Bad selections}: decoys, unsupported ranges, overlaps, or extra bytes.
+    \item \textbf{Extra carves}: carving before validating boundaries and order.
+    \item \textbf{Wrong reports}: overclaiming partial evidence or misclassifying recovery.
+    \item \textbf{Procedure mistakes}: failed post-action forensic decisions.
+    \item \textbf{Final mastery}: signature recognition, offset precision, fragment
+      reconstruction, trial-and-error discipline, obfuscation handling, procedure
+      discipline, forensic reasoning, reporting quality.
+  \end{itemize}
 \end{frame}
 
 % 9
@@ -180,7 +178,9 @@
     \item \textbf{Frontend}: React and Vite.
     \item \textbf{Levels}: data-driven JSON dumps in \texttt{public/levels/}.
     \item \textbf{Generators}: deterministic Python scripts in \texttt{scripts/level\_generation/}.
-    \item \textbf{Evidence}: small source artifacts in \texttt{assets/}, runtime images in \texttt{public/evidence/}.
+    \item \textbf{Evidence}: source artefacts and UI visuals in \texttt{assets/};
+      playable level data in \texttt{public/levels/}.
+    \item \textbf{Media}: intro video in \texttt{public/intro.mp4}, with browser-safe audio enable.
     \item \textbf{Runtime}: browser-based interaction, no backend dependency during play.
   \end{itemize}
 
@@ -208,8 +208,9 @@
     \end{column}
     \begin{column}{0.49\textwidth}
       \begin{block}{Suggested demo}
-        Show Act 1 for \textbf{validation}, Act 4 for offset reasoning, Act 5 or 6
-        for XOR, and close with the \textbf{final competency report}.
+        Show the \textbf{evidence intake}, Act 1 for validation, Act 4 for offset
+        reasoning, Act 5 or 6 for XOR, then close with the \textbf{timeline board}
+        and final competency report.
       \end{block}
     \end{column}
   \end{columns}

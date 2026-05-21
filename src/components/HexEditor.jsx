@@ -173,11 +173,11 @@ export default function HexEditor({
     let scrollDelta = 0;
 
     if (y < rect.top + AUTO_SCROLL_EDGE_ZONE) {
-      // Near top edge — scroll up
+      // Near top edge - scroll up
       const proximity = Math.max(0, 1 - (y - rect.top) / AUTO_SCROLL_EDGE_ZONE); // 0..1
       scrollDelta = -AUTO_SCROLL_MAX_SPEED * proximity;
     } else if (y > rect.bottom - AUTO_SCROLL_EDGE_ZONE) {
-      // Near bottom edge — scroll down
+      // Near bottom edge - scroll down
       const proximity = Math.max(0, 1 - (rect.bottom - y) / AUTO_SCROLL_EDGE_ZONE); // 0..1
       scrollDelta = AUTO_SCROLL_MAX_SPEED * proximity;
     }
@@ -260,13 +260,13 @@ export default function HexEditor({
 
   return (
     <div className="bg-gray-900/80 border border-gray-700/50 rounded-lg flex flex-col flex-1 min-h-0 overflow-hidden"
-         style={{ boxShadow: '0 0 20px rgba(0,0,0,0.3)' }}>
+      style={{ boxShadow: '0 0 20px rgba(0,0,0,0.3)' }}>
       {/* Toolbar */}
       <div className="flex justify-between items-center gap-3 border-b border-gray-800 px-4 py-2.5 shrink-0 bg-gray-900">
         <div className="flex items-center gap-3">
           <h2 className="text-xs font-bold text-gray-300 tracking-widest uppercase flex items-center gap-2">
             <span className={`w-2 h-2 rounded-full ${hexBytes.length > 0 ? 'bg-green-500 animate-pulse' : 'bg-gray-600'}`}
-                  style={hexBytes.length > 0 ? { boxShadow: '0 0 8px rgba(74,222,128,0.6)' } : {}} />
+              style={hexBytes.length > 0 ? { boxShadow: '0 0 8px rgba(74,222,128,0.6)' } : {}} />
             Hex Editor
           </h2>
           {hexBytes.length > 0 && (
@@ -337,7 +337,7 @@ export default function HexEditor({
         </div>
       </div>
 
-      {/* Hex content — continuous scroll with drag auto-scroll */}
+      {/* Hex content - continuous scroll with drag auto-scroll */}
       <div className="flex-1 overflow-hidden flex flex-col min-h-0">
         {hexBytes.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">
@@ -360,7 +360,7 @@ export default function HexEditor({
               <div>ASCII</div>
             </div>
 
-            {/* All rows — scrollable */}
+            {/* All rows - scrollable */}
             <div
               ref={scrollRef}
               className="flex-1 overflow-y-auto px-4 font-mono text-[13px] select-none min-h-0"
@@ -381,7 +381,7 @@ export default function HexEditor({
                     <div key={absOffset} className="flex h-[22px] items-center text-red-500/40">
                       <div className="w-[72px] shrink-0 text-red-700/50">{formatOffset(absOffset)}</div>
                       <div className="italic text-[10px] flex items-center text-red-600/40">
-                        ◆ ENCRYPTED SECTOR — use "go &lt;offset&gt;" to unlock
+                        ◆ ENCRYPTED SECTOR - use &quot;go &lt;offset&gt;&quot; to unlock
                       </div>
                     </div>
                   );
@@ -463,7 +463,7 @@ export default function HexEditor({
 
           <div className="flex items-center gap-2 text-[10px] text-gray-600 font-mono">
             <span>
-              0x{formatOffset(viewRange.start)}—0x{formatOffset(viewRange.end)}
+              0x{formatOffset(viewRange.start)}-0x{formatOffset(viewRange.end)}
             </span>
           </div>
 

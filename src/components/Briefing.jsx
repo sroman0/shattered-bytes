@@ -13,9 +13,9 @@ export default function Briefing({ level, onStart, ctaLabel = 'Begin Investigati
   return (
     <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 backdrop-blur-sm p-4">
       <div className="bg-gray-900 border border-cyan-800/40 rounded-xl w-full max-w-2xl flex flex-col"
-           style={{ boxShadow: '0 0 40px rgba(6,182,212,0.1)', maxHeight: 'calc(100vh - 2rem)' }}>
+        style={{ boxShadow: '0 0 40px rgba(6,182,212,0.1)', maxHeight: 'calc(100vh - 2rem)' }}>
 
-        {/* Header — compact */}
+        {/* Header - compact */}
         <div className="bg-gradient-to-r from-cyan-900/30 to-gray-900 px-5 py-3 border-b border-cyan-800/30 shrink-0">
           <div className="text-[10px] text-cyan-600 uppercase tracking-[0.3em] mb-0.5">Mission Briefing</div>
           <h2 className="text-base font-bold text-white">{level.title}</h2>
@@ -27,21 +27,19 @@ export default function Briefing({ level, onStart, ctaLabel = 'Begin Investigati
           <div className="flex border-b border-gray-800 shrink-0">
             <button
               onClick={() => setActiveTab('mission')}
-              className={`flex-1 px-4 py-2 text-[10px] uppercase tracking-wider font-bold transition-all ${
-                activeTab === 'mission'
+              className={`flex-1 px-4 py-2 text-[10px] uppercase tracking-wider font-bold transition-all ${activeTab === 'mission'
                   ? 'text-cyan-400 border-b-2 border-cyan-400 bg-cyan-950/20'
                   : 'text-gray-600 hover:text-gray-400'
-              }`}
+                }`}
             >
               📋 Mission Brief
             </button>
             <button
               onClick={() => setActiveTab('concept')}
-              className={`flex-1 px-4 py-2 text-[10px] uppercase tracking-wider font-bold transition-all ${
-                activeTab === 'concept'
+              className={`flex-1 px-4 py-2 text-[10px] uppercase tracking-wider font-bold transition-all ${activeTab === 'concept'
                   ? 'text-emerald-400 border-b-2 border-emerald-400 bg-emerald-950/20'
                   : 'text-gray-600 hover:text-gray-400'
-              }`}
+                }`}
             >
               📖 Forensic Concept
             </button>
@@ -74,6 +72,19 @@ export default function Briefing({ level, onStart, ctaLabel = 'Begin Investigati
                   </div>
                 ))}
               </div>
+
+              {level.forensicFocus && (
+                <div className="bg-emerald-950/15 border border-emerald-900/40 rounded-lg px-3.5 py-3 mb-4">
+                  <div className="text-[9px] text-emerald-500 uppercase tracking-[0.22em] mb-1 font-bold">
+                    Forensic Focus
+                  </div>
+                  <p className="text-xs text-gray-300 leading-relaxed">
+                    <span className="text-emerald-300 font-bold">{level.forensicFocus.label}</span>
+                    <span className="text-gray-500"> - </span>
+                    {level.forensicFocus.rationale}
+                  </p>
+                </div>
+              )}
 
               {/* Objectives */}
               <div className="bg-gray-800/40 rounded-lg p-3.5 border border-gray-700/30 mb-4">
@@ -134,7 +145,7 @@ export default function Briefing({ level, onStart, ctaLabel = 'Begin Investigati
                 )}
               </div>
 
-              {/* Worked Example — shown for levels with walkthroughExample (e.g. MBR) */}
+              {/* Worked Example - shown for levels with walkthroughExample (e.g. MBR) */}
               {level.walkthroughExample && (
                 <div className="bg-amber-950/20 border border-amber-700/30 rounded-lg p-4 mb-4">
                   <div className="text-[10px] text-amber-400 uppercase tracking-[0.2em] mb-2 font-bold flex items-center gap-1.5">
@@ -157,7 +168,7 @@ export default function Briefing({ level, onStart, ctaLabel = 'Begin Investigati
           )}
         </div>
 
-        {/* Footer — always visible */}
+        {/* Footer - always visible */}
         <div className="px-5 py-3 bg-gray-950/50 border-t border-gray-800 shrink-0">
           <div className="flex items-center justify-between text-[10px] text-gray-500 mb-3">
             <span>Max score: <span className="text-yellow-400 font-bold">{level.maxScore}</span> pts</span>

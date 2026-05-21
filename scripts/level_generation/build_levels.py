@@ -69,7 +69,7 @@ def build_level(filename, data):
 
 
 # ════════════════════════════════════════════════════════════════════
-# LEVEL 1 — Intake & False Lead
+# LEVEL 1 - Intake & False Lead
 # Scenario: Seized laptop. Deleted chat screenshot used to coordinate
 #           a ransomware payment. Contains a planted decoy PNG header.
 # Evidence: evidence_chat_tiny.png (encrypted chat log)
@@ -78,7 +78,7 @@ def level_1():
     target = EVIDENCE_CHAT_PNG
 
     pre_decoy  = noise(400)
-    # Decoy: PNG header fragment from a different (forged) document — no valid footer
+    # Decoy: PNG header fragment from a different (forged) document - no valid footer
     decoy = PNG_HEADER + b'DECOY_FORGED_DOC' + noise(30)
     mid_noise  = noise(1800)
     post_noise = noise(1800 - len(target))
@@ -99,7 +99,7 @@ def level_1():
         "metadata": {
             "false_positives": [
                 {"start": d_start, "end": d_end,
-                 "reason": "PNG header-like decoy without valid IEND footer — signature alone is not evidence"}
+                 "reason": "PNG header-like decoy without valid IEND footer - signature alone is not evidence"}
             ]
         },
         "solution_offsets": [{"start": t_start, "end": t_end}]
@@ -107,7 +107,7 @@ def level_1():
 
 
 # ════════════════════════════════════════════════════════════════════
-# LEVEL 2 — The Fracture
+# LEVEL 2 - The Fracture
 # Scenario: The suspect's SSD used TRIM, fragmenting a screenshot of
 #           a forged identity document into two non-contiguous pieces.
 # Evidence: evidence_document_tiny.png (forged ID scan)
@@ -179,7 +179,7 @@ def level_2():
 
 
 # ════════════════════════════════════════════════════════════════════
-# LEVEL 3 — Multi-Signature Triage
+# LEVEL 3 - Multi-Signature Triage
 # Scenario: ATM skimming investigation. The disk image contains a PDF
 #           report (decoy) and a truncated JPEG (false lead). The real
 #           evidence is a CCTV surveillance still from the ATM camera.
@@ -214,7 +214,7 @@ def level_3():
         "metadata": {
             "false_positives": [
                 {"start": pd_start, "end": pd_end,
-                 "reason": "Valid PDF structure but not the target artefact — intelligence specifies a JPEG image"},
+                 "reason": "Valid PDF structure but not the target artefact - intelligence specifies a JPEG image"},
                 {"start": jd_start, "end": jd_end,
                  "reason": "Truncated JPEG SOI marker without valid EOI footer"}
             ],
@@ -225,7 +225,7 @@ def level_3():
 
 
 # ════════════════════════════════════════════════════════════════════
-# LEVEL 4 — Partition Archaeology
+# LEVEL 4 - Partition Archaeology
 # Scenario: Seized accountant's hard drive with MBR partition table.
 #           A screenshot proving fraudulent wire transfers was hidden
 #           inside the first NTFS partition. Parse MBR to find it.
@@ -279,7 +279,7 @@ def level_4():
 
 
 # ════════════════════════════════════════════════════════════════════
-# LEVEL 5 — The Obscured Tail
+# LEVEL 5 - The Obscured Tail
 # Scenario: A ransomware infection left an encrypted config file
 #           containing the decryption key. XOR-encoded with key 0x2A.
 #           Only partial data survived disk overwriting.
@@ -346,7 +346,7 @@ def level_5():
             "entropy_block_size": 64,
             "false_positives": [
                 {"start": dt_start, "end": dt_end,
-                 "reason": "NXPL-marked XOR candidate with different key — not the target payload"}
+                 "reason": "NXPL-marked XOR candidate with different key - not the target payload"}
             ]
         },
         "solution_offsets": [{"start": t_start, "end": t_end}]
@@ -354,7 +354,7 @@ def level_5():
 
 
 # ════════════════════════════════════════════════════════════════════
-# LEVEL 6 — Ransomware Aftermath
+# LEVEL 6 - Ransomware Aftermath
 # Scenario: Post-breach investigation. Exfiltrated credentials file
 #           was XOR-encrypted (key 0x1B) and split into 3 fragments
 #           across unallocated disk space. Recover all fragments.
@@ -460,9 +460,9 @@ def level_6():
             ],
             "false_positives": [
                 {"start": d1_start, "end": d1_end,
-                 "reason": "Corrupted PNG header — anti-forensics bait, not the target payload"},
+                 "reason": "Corrupted PNG header - anti-forensics bait, not the target payload"},
                 {"start": d2_start, "end": d2_end,
-                 "reason": "XOR-encoded noise with wrong key (0x3C) — decoy credentials"}
+                 "reason": "XOR-encoded noise with wrong key (0x3C) - decoy credentials"}
             ]
         },
         "solution_offsets": [

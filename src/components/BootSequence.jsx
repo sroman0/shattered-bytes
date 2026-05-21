@@ -13,7 +13,7 @@ const BOOT_LINES = [
   { text: '[  OK  ] Evidence journal subsystem initialized', delay: 200 },
   { text: '', delay: 300 },
   { text: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', delay: 100, style: 'text-green-600/50' },
-  { text: '  SHATTERED BYTES — Digital Forensics Lab', delay: 200, style: 'text-green-400 font-bold' },
+  { text: '  SHATTERED BYTES - Digital Forensics Lab', delay: 200, style: 'text-green-400 font-bold' },
   { text: '  All systems operational. Welcome, Agent.', delay: 300, style: 'text-cyan-400' },
   { text: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', delay: 100, style: 'text-green-600/50' },
 ];

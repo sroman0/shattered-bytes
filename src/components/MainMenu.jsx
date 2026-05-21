@@ -8,16 +8,16 @@ export default function MainMenu({ onStart, onHowToPlay, completedLevels, totalS
     <div className="h-screen bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden">
       {/* Background grid effect */}
       <div className="absolute inset-0 opacity-5"
-           style={{
-             backgroundImage: 'linear-gradient(rgba(74,222,128,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(74,222,128,0.3) 1px, transparent 1px)',
-             backgroundSize: '40px 40px',
-           }} />
+        style={{
+          backgroundImage: 'linear-gradient(rgba(74,222,128,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(74,222,128,0.3) 1px, transparent 1px)',
+          backgroundSize: '40px 40px',
+        }} />
 
       {/* Scanline overlay */}
       <div className="absolute inset-0 pointer-events-none opacity-[0.03]"
-           style={{
-             backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.5) 2px, rgba(0,0,0,0.5) 4px)',
-           }} />
+        style={{
+          backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.5) 2px, rgba(0,0,0,0.5) 4px)',
+        }} />
 
       <div className="relative z-10 text-center max-w-2xl mx-auto px-4">
         {/* Logo */}
@@ -81,7 +81,11 @@ export default function MainMenu({ onStart, onHowToPlay, completedLevels, totalS
             <button
               onClick={() => {
                 if (window.confirm('Start a new game? Your current progress will be lost.')) {
-                  try { localStorage.removeItem('shattered_bytes_save'); } catch {}
+                  try {
+                    localStorage.removeItem('shattered_bytes_save');
+                  } catch {
+                    // Ignore storage failures and still let the browser reload.
+                  }
                   window.location.reload();
                 }
               }}
@@ -93,7 +97,7 @@ export default function MainMenu({ onStart, onHowToPlay, completedLevels, totalS
         </div>
 
         <div className="mt-10 text-[9px] text-gray-700 space-y-1">
-          <p>Computer Forensics and Cyber Crime Analysis — Serious Game Project</p>
+          <p>Computer Forensics and Cyber Crime Analysis - Serious Game Project</p>
           <p>Built with React + Python | Data Carving Educational Framework</p>
         </div>
       </div>

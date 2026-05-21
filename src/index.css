@@ -45,19 +45,30 @@
   }
 
   /* Buttons, links, clickable elements */
-  a, button, [role="button"], label,
-  select, summary, [tabindex]:not([tabindex="-1"]) {
+  a,
+  button,
+  [role="button"],
+  label,
+  select,
+  summary,
+  [tabindex]:not([tabindex="-1"]) {
     cursor: var(--cursor-pointer), pointer !important;
   }
 
   /* Text inputs */
-  input[type="text"], input[type="search"], input[type="email"],
-  input[type="password"], input[type="number"], input[type="url"],
-  input[type="tel"], textarea, [contenteditable="true"] {
+  input[type="text"],
+  input[type="search"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="url"],
+  input[type="tel"],
+  textarea,
+  [contenteditable="true"] {
     cursor: var(--cursor-text), text !important;
   }
 
-  /* Hex editor byte cells — keep crosshair via class */
+  /* Hex editor byte cells - keep crosshair via class */
   .cursor-crosshair {
     cursor: var(--cursor-crosshair), crosshair !important;
   }
@@ -70,16 +81,35 @@
 
 /* ── Animations for toast / nudge system ── */
 @keyframes slideInRight {
-  from { transform: translateX(100%); opacity: 0; }
-  to   { transform: translateX(0);    opacity: 1; }
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 @keyframes fadeOut {
-  from { opacity: 1; }
-  to   { opacity: 0; }
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
 }
 
 @keyframes slideUpFade {
-  from { transform: translate(-50%, 20px); opacity: 0; }
-  to   { transform: translate(-50%, 0);    opacity: 1; }
+  from {
+    transform: translate(-50%, 20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
 }
