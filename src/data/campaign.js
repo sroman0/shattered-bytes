@@ -74,9 +74,9 @@ export const CAMPAIGN = [
       { id: 'report_recovered', text: 'Report the evidence as fully recovered', completed: false },
     ],
     hints: [
-      'PNG files start with 89 50 4E 47 0D 0A 1A 0A and end with 49 45 4E 44 AE 42 60 82.',
-      'A header without a coherent footer is only a lead, not evidence.',
-      'Use search 89504E47 to find all occurrences, then verify each one.',
+      'Start by thinking like a triage examiner: a familiar byte pattern tells you where to look, not what to believe.',
+      'The correct candidate should behave like a whole image, with a plausible start, internal structure, and a coherent ending.',
+      'Search for a short PNG lead such as 89504E47, then reject any occurrence that cannot be bounded by a matching PNG ending.',
     ],
     maxScore: 150,
     timeBonusThreshold: 240,
@@ -153,11 +153,11 @@ export const CAMPAIGN = [
       { id: 'report_recovered', text: 'Report the evidence as fully recovered', completed: false },
     ],
     hints: [
-      'Look for the recovered run descriptors: FR01 = 46 52 30 31 and FR02 = 46 52 30 32.',
-      'Each FR marker is followed by a two-byte length field, then the fragment bytes. 00 AA means 170 bytes; 00 AB means 171 bytes.',
-      'The PNG header confirms fragment 1, and the IEND footer confirms fragment 2.',
-      'Do not include the FR marker, length bytes, or unallocated garbage in the stashed fragments.',
-      'You can reorder fragments in the Workbench by dragging them.',
+      'A fragmented file will not reward a single long selection. Look for small pieces of filesystem bookkeeping that survived near the data.',
+      'The labels around the fragments are not image content; they are closer to road signs left by the disk history.',
+      'Immediately after each label there is boundary information. Use it to decide how many following bytes belong to the fragment.',
+      'One selected run should account for the image beginning, while another should account for the image ending. Bytes between them are not automatically part of the file.',
+      'Stash only fragment payload bytes, then arrange the Workbench in logical file order before carving.',
     ],
     procedureChecks: [
       {
@@ -254,10 +254,10 @@ export const CAMPAIGN = [
       { id: 'report_recovered', text: 'Report the evidence as fully recovered', completed: false },
     ],
     hints: [
-      'The case asks for something visually tied to ATM surveillance. A complete administrative document can still be irrelevant.',
-      'Look for image-format candidates and verify both their header and footer before selecting bytes.',
-      'JPEG still frames start with FF D8 FF and end with FF D9.',
-      'A document signature such as %PDF can be recoverable without answering this case question.',
+      'Before searching signatures, reread the case question: the useful artefact is the one that can answer it directly.',
+      'Several files may be technically recoverable. Ask which one would help an investigator place a person at a cash-out scene.',
+      'A visual clue is more likely to be an image than an administrative document. Still, verify boundaries before carving.',
+      'If you find a JPEG-like candidate, check that it closes correctly with its end marker before selecting the exact range.',
     ],
     procedureChecks: [
       {
@@ -360,12 +360,12 @@ export const CAMPAIGN = [
       { id: 'report_recovered', text: 'Report the evidence as fully recovered', completed: false },
     ],
     hints: [
-      'The partition table starts at byte offset 446 (0x1BE) from the beginning of the dump.',
-      'Each partition entry is 16 bytes. The first entry starts at 0x1BE.',
-      'Bytes 8-11 of the entry contain the LBA start in Little-Endian. Read them right-to-left.',
-      'After reversing those bytes into normal hex, use hex2dec to avoid mixing hexadecimal and decimal notation.',
-      'The sector size is 32 bytes. Multiply the LBA start by 32 to get the byte offset.',
-      'After calculating, use: go <offset> in the terminal to unlock.',
+      'If searching for the image feels blocked, step back: the storage layout itself may be the clue.',
+      'The MBR partition table is a map. Find the partition entry before trying to interpret hidden content.',
+      'Inside the entry, the start location is stored as an LBA value, not as a direct byte offset.',
+      'The LBA field is little-endian. Reverse the byte order into normal hexadecimal before converting it to decimal.',
+      'The terminal command go expects bytes. Multiply the decoded LBA by the sector size reported in the level.',
+      'Once you have unlocked the calculated byte position, return to the usual carving workflow and validate the image boundaries.',
     ],
     procedureChecks: [
       {
@@ -482,12 +482,12 @@ export const CAMPAIGN = [
       { id: 'report_partial', text: 'Report a partial recovery without overclaiming', completed: false },
     ],
     hints: [
-      'Search for loader markers: NM is 4E4D and NX is 4E58. The encrypted candidate starts 4 bytes after the marker.',
-      'You can also use entropy to identify blocks whose byte distribution differs from the surrounding random filler.',
-      'For single-byte XOR, plaintext_byte XOR ciphertext_byte reveals the key. Test each candidate with ASCII "R" (0x52).',
-      'The NMPL candidate should derive key 0x2A and decode into RANSOMWARE_PAYLOAD...',
-      'A missing tail means the correct conclusion is partial, not recovered.',
-      'The report matters here as much as the byte selection.',
+      'The payload is not meant to be readable at first glance. Look for something around it that a loader would use to find its own data.',
+      'A marker gives you candidates, not certainty. Compare candidates by what they become after decoding.',
+      'The expected plaintext beginning is your lever: combine the first encoded byte with the first expected plaintext byte to test a key.',
+      'Apply the candidate key mentally or with the terminal to a few bytes first. Meaningful text should emerge quickly if the candidate is real.',
+      'If one candidate decodes coherently and another does not, select the coherent surviving range but stop where the recovered data actually ends.',
+      'Because the tail is missing, the defensible terminal conclusion is partial rather than fully recovered.',
     ],
     procedureChecks: [
       {
@@ -592,12 +592,12 @@ export const CAMPAIGN = [
       { id: 'report_recovered', text: 'Report a full recovery of the credential payload', completed: false },
     ],
     hints: [
-      'Search for staging records: EX01 = 45 58 30 31, EX02 = 45 58 30 32, EX03 = 45 58 30 33.',
-      'The byte immediately after each EX record is the fragment length. Stash the encrypted bytes after that length byte.',
-      'ASCII "E" = 0x45. XOR the first byte after EX01 with 0x45 to derive the key.',
-      'EXD0 is a decoy credential block using a different XOR key (0x3C) - it will produce garbage with the real key.',
-      'Fragment order follows the record IDs: EX01, EX02, EX03.',
-      'After stashing all 3 fragments in order, apply XOR in the Workbench, then Compose & Carve.',
+      'This final dump combines earlier lessons: fragments, record structure, decoys, and XOR. Solve the structure before solving the text.',
+      'The useful fragments are near compact staging records. Convert or search the record names, then inspect the bytes immediately after them.',
+      'The byte after each genuine record tag is not payload text; it tells you how far that fragment runs.',
+      'Use the expected plaintext only on the beginning of the first genuine payload fragment to derive the XOR key.',
+      'A decoy may share the same visual pattern but fail the coherence test after decryption. Validate decoded meaning across all fragments.',
+      'Stash only the encrypted payload bytes from the genuine records, order them by record sequence, decrypt, then compose and carve.',
     ],
     procedureChecks: [
       {
