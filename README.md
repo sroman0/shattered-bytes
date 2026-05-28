@@ -1,6 +1,6 @@
 # Shattered Bytes
 
-![Game Logo/Banner Placeholder]
+![Shattered Bytes banner](title-removebg-preview.png)
 
 **Shattered Bytes** is a Serious Game developed for the *Computer Forensics and Cyber Crime Analysis (CFCA)* course. It is designed to immerse players in the role of a Junior Digital Forensic Analyst, challenging them to recover, reconstruct, and analyze evidence from raw binary data.
 
